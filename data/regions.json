@@ -1,480 +1,77 @@
 {
   "metadata": {
-    "description": "수도권 시/군/구 지역 코드 매핑 (Naver Land cortarNo 기준)",
-    "naver_trade_type": {
-      "매매": "A1",
-      "전세": "B1",
-      "월세": "B2"
-    },
-    "zigbang_trade_type": {
-      "매매": "SALE",
-      "전세": "JEONSE",
-      "월세": "MONTHLY_RENT"
-    },
+    "description": "수도권 시/군/구 지역 코드 매핑 (한국 공식 법정동코드 기준)",
+    "cortar_no_format": "10자리 법정동코드 (시도2 + 시군구3 + 읍면동3 + 리2 = 구 단위는 하위 5자리 00000)",
+    "naver_trade_type": { "매매": "A1", "전세": "B1", "월세": "B2" },
+    "zigbang_trade_type": { "매매": "SALE", "전세": "JEONSE", "월세": "MONTHLY_RENT" },
     "naver_real_estate_type": "APT"
   },
   "regions": [
-    {
-      "region_level1": "서울특별시",
-      "region_level2": "종로구",
-      "cortar_no": "1101000000",
-      "center_lat": 37.5730,
-      "center_lng": 126.9794
-    },
-    {
-      "region_level1": "서울특별시",
-      "region_level2": "중구",
-      "cortar_no": "1102000000",
-      "center_lat": 37.5640,
-      "center_lng": 126.9975
-    },
-    {
-      "region_level1": "서울특별시",
-      "region_level2": "용산구",
-      "cortar_no": "1103000000",
-      "center_lat": 37.5384,
-      "center_lng": 126.9654
-    },
-    {
-      "region_level1": "서울특별시",
-      "region_level2": "성동구",
-      "cortar_no": "1104000000",
-      "center_lat": 37.5635,
-      "center_lng": 127.0369
-    },
-    {
-      "region_level1": "서울특별시",
-      "region_level2": "광진구",
-      "cortar_no": "1105000000",
-      "center_lat": 37.5384,
-      "center_lng": 127.0822
-    },
-    {
-      "region_level1": "서울특별시",
-      "region_level2": "동대문구",
-      "cortar_no": "1106000000",
-      "center_lat": 37.5744,
-      "center_lng": 127.0396
-    },
-    {
-      "region_level1": "서울특별시",
-      "region_level2": "중랑구",
-      "cortar_no": "1107000000",
-      "center_lat": 37.5953,
-      "center_lng": 127.0935
-    },
-    {
-      "region_level1": "서울특별시",
-      "region_level2": "성북구",
-      "cortar_no": "1108000000",
-      "center_lat": 37.6066,
-      "center_lng": 127.0183
-    },
-    {
-      "region_level1": "서울특별시",
-      "region_level2": "강북구",
-      "cortar_no": "1109000000",
-      "center_lat": 37.6396,
-      "center_lng": 127.0253
-    },
-    {
-      "region_level1": "서울특별시",
-      "region_level2": "도봉구",
-      "cortar_no": "1110000000",
-      "center_lat": 37.6688,
-      "center_lng": 127.0471
-    },
-    {
-      "region_level1": "서울특별시",
-      "region_level2": "노원구",
-      "cortar_no": "1111000000",
-      "center_lat": 37.6542,
-      "center_lng": 127.0568
-    },
-    {
-      "region_level1": "서울특별시",
-      "region_level2": "은평구",
-      "cortar_no": "1112000000",
-      "center_lat": 37.6026,
-      "center_lng": 126.9287
-    },
-    {
-      "region_level1": "서울특별시",
-      "region_level2": "서대문구",
-      "cortar_no": "1113000000",
-      "center_lat": 37.5791,
-      "center_lng": 126.9368
-    },
-    {
-      "region_level1": "서울특별시",
-      "region_level2": "마포구",
-      "cortar_no": "1114000000",
-      "center_lat": 37.5663,
-      "center_lng": 126.9014
-    },
-    {
-      "region_level1": "서울특별시",
-      "region_level2": "양천구",
-      "cortar_no": "1115000000",
-      "center_lat": 37.5170,
-      "center_lng": 126.8665
-    },
-    {
-      "region_level1": "서울특별시",
-      "region_level2": "강서구",
-      "cortar_no": "1116000000",
-      "center_lat": 37.5509,
-      "center_lng": 126.8495
-    },
-    {
-      "region_level1": "서울특별시",
-      "region_level2": "구로구",
-      "cortar_no": "1117000000",
-      "center_lat": 37.4954,
-      "center_lng": 126.8874
-    },
-    {
-      "region_level1": "서울특별시",
-      "region_level2": "금천구",
-      "cortar_no": "1118000000",
-      "center_lat": 37.4566,
-      "center_lng": 126.9000
-    },
-    {
-      "region_level1": "서울특별시",
-      "region_level2": "영등포구",
-      "cortar_no": "1119000000",
-      "center_lat": 37.5264,
-      "center_lng": 126.8963
-    },
-    {
-      "region_level1": "서울특별시",
-      "region_level2": "동작구",
-      "cortar_no": "1120000000",
-      "center_lat": 37.5124,
-      "center_lng": 126.9393
-    },
-    {
-      "region_level1": "서울특별시",
-      "region_level2": "관악구",
-      "cortar_no": "1121000000",
-      "center_lat": 37.4784,
-      "center_lng": 126.9516
-    },
-    {
-      "region_level1": "서울특별시",
-      "region_level2": "서초구",
-      "cortar_no": "1122000000",
-      "center_lat": 37.4837,
-      "center_lng": 127.0325
-    },
-    {
-      "region_level1": "서울특별시",
-      "region_level2": "강남구",
-      "cortar_no": "1123000000",
-      "center_lat": 37.5172,
-      "center_lng": 127.0473
-    },
-    {
-      "region_level1": "서울특별시",
-      "region_level2": "송파구",
-      "cortar_no": "1124000000",
-      "center_lat": 37.5145,
-      "center_lng": 127.1059
-    },
-    {
-      "region_level1": "서울특별시",
-      "region_level2": "강동구",
-      "cortar_no": "1125000000",
-      "center_lat": 37.5301,
-      "center_lng": 127.1238
-    },
-    {
-      "region_level1": "인천광역시",
-      "region_level2": "중구",
-      "cortar_no": "2810000000",
-      "center_lat": 37.4734,
-      "center_lng": 126.6219
-    },
-    {
-      "region_level1": "인천광역시",
-      "region_level2": "동구",
-      "cortar_no": "2811000000",
-      "center_lat": 37.4739,
-      "center_lng": 126.6435
-    },
-    {
-      "region_level1": "인천광역시",
-      "region_level2": "미추홀구",
-      "cortar_no": "2814000000",
-      "center_lat": 37.4638,
-      "center_lng": 126.6505
-    },
-    {
-      "region_level1": "인천광역시",
-      "region_level2": "연수구",
-      "cortar_no": "2815000000",
-      "center_lat": 37.4099,
-      "center_lng": 126.6782
-    },
-    {
-      "region_level1": "인천광역시",
-      "region_level2": "남동구",
-      "cortar_no": "2816000000",
-      "center_lat": 37.4470,
-      "center_lng": 126.7310
-    },
-    {
-      "region_level1": "인천광역시",
-      "region_level2": "부평구",
-      "cortar_no": "2817000000",
-      "center_lat": 37.5074,
-      "center_lng": 126.7219
-    },
-    {
-      "region_level1": "인천광역시",
-      "region_level2": "계양구",
-      "cortar_no": "2818000000",
-      "center_lat": 37.5374,
-      "center_lng": 126.7376
-    },
-    {
-      "region_level1": "인천광역시",
-      "region_level2": "서구",
-      "cortar_no": "2819000000",
-      "center_lat": 37.5449,
-      "center_lng": 126.6757
-    },
-    {
-      "region_level1": "인천광역시",
-      "region_level2": "강화군",
-      "cortar_no": "2882500000",
-      "center_lat": 37.7479,
-      "center_lng": 126.4877
-    },
-    {
-      "region_level1": "인천광역시",
-      "region_level2": "옹진군",
-      "cortar_no": "2883500000",
-      "center_lat": 37.4323,
-      "center_lng": 126.3551
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "수원시",
-      "cortar_no": "4111000000",
-      "center_lat": 37.2636,
-      "center_lng": 127.0286
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "성남시",
-      "cortar_no": "4113000000",
-      "center_lat": 37.4449,
-      "center_lng": 127.1389
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "의정부시",
-      "cortar_no": "4115000000",
-      "center_lat": 37.7381,
-      "center_lng": 127.0338
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "안양시",
-      "cortar_no": "4117000000",
-      "center_lat": 37.3943,
-      "center_lng": 126.9568
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "부천시",
-      "cortar_no": "4119000000",
-      "center_lat": 37.5035,
-      "center_lng": 126.7660
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "광명시",
-      "cortar_no": "4121000000",
-      "center_lat": 37.4784,
-      "center_lng": 126.8643
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "평택시",
-      "cortar_no": "4122000000",
-      "center_lat": 36.9921,
-      "center_lng": 127.1127
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "동두천시",
-      "cortar_no": "4125000000",
-      "center_lat": 37.9036,
-      "center_lng": 127.0606
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "안산시",
-      "cortar_no": "4127000000",
-      "center_lat": 37.3219,
-      "center_lng": 126.8309
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "고양시",
-      "cortar_no": "4128000000",
-      "center_lat": 37.6584,
-      "center_lng": 126.8320
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "과천시",
-      "cortar_no": "4129000000",
-      "center_lat": 37.4292,
-      "center_lng": 126.9878
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "구리시",
-      "cortar_no": "4131000000",
-      "center_lat": 37.5943,
-      "center_lng": 127.1297
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "남양주시",
-      "cortar_no": "4136000000",
-      "center_lat": 37.6360,
-      "center_lng": 127.2165
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "오산시",
-      "cortar_no": "4137000000",
-      "center_lat": 37.1499,
-      "center_lng": 127.0771
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "시흥시",
-      "cortar_no": "4139000000",
-      "center_lat": 37.3800,
-      "center_lng": 126.8030
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "군포시",
-      "cortar_no": "4141000000",
-      "center_lat": 37.3614,
-      "center_lng": 126.9352
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "의왕시",
-      "cortar_no": "4143000000",
-      "center_lat": 37.3448,
-      "center_lng": 126.9681
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "하남시",
-      "cortar_no": "4145000000",
-      "center_lat": 37.5400,
-      "center_lng": 127.2147
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "용인시",
-      "cortar_no": "4146000000",
-      "center_lat": 37.2411,
-      "center_lng": 127.1776
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "파주시",
-      "cortar_no": "4148000000",
-      "center_lat": 37.7599,
-      "center_lng": 126.7800
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "이천시",
-      "cortar_no": "4150000000",
-      "center_lat": 37.2720,
-      "center_lng": 127.4345
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "안성시",
-      "cortar_no": "4155000000",
-      "center_lat": 37.0078,
-      "center_lng": 127.2797
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "김포시",
-      "cortar_no": "4157000000",
-      "center_lat": 37.6153,
-      "center_lng": 126.7157
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "화성시",
-      "cortar_no": "4159000000",
-      "center_lat": 37.1998,
-      "center_lng": 126.8318
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "광주시",
-      "cortar_no": "4161000000",
-      "center_lat": 37.4296,
-      "center_lng": 127.2553
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "양주시",
-      "cortar_no": "4163000000",
-      "center_lat": 37.7852,
-      "center_lng": 127.0456
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "포천시",
-      "cortar_no": "4165000000",
-      "center_lat": 37.8949,
-      "center_lng": 127.2003
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "여주시",
-      "cortar_no": "4167000000",
-      "center_lat": 37.2983,
-      "center_lng": 127.6377
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "연천군",
-      "cortar_no": "4180000000",
-      "center_lat": 38.0961,
-      "center_lng": 127.0748
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "가평군",
-      "cortar_no": "4182000000",
-      "center_lat": 37.8314,
-      "center_lng": 127.5108
-    },
-    {
-      "region_level1": "경기도",
-      "region_level2": "양평군",
-      "cortar_no": "4183000000",
-      "center_lat": 37.4916,
-      "center_lng": 127.4875
-    }
+    { "region_level1": "서울특별시", "region_level2": "종로구",  "cortar_no": "1111000000", "center_lat": 37.5730, "center_lng": 126.9794 },
+    { "region_level1": "서울특별시", "region_level2": "중구",    "cortar_no": "1114000000", "center_lat": 37.5640, "center_lng": 126.9975 },
+    { "region_level1": "서울특별시", "region_level2": "용산구",  "cortar_no": "1117000000", "center_lat": 37.5384, "center_lng": 126.9654 },
+    { "region_level1": "서울특별시", "region_level2": "성동구",  "cortar_no": "1120000000", "center_lat": 37.5635, "center_lng": 127.0369 },
+    { "region_level1": "서울특별시", "region_level2": "광진구",  "cortar_no": "1121500000", "center_lat": 37.5384, "center_lng": 127.0822 },
+    { "region_level1": "서울특별시", "region_level2": "동대문구","cortar_no": "1123000000", "center_lat": 37.5744, "center_lng": 127.0396 },
+    { "region_level1": "서울특별시", "region_level2": "중랑구",  "cortar_no": "1126000000", "center_lat": 37.5953, "center_lng": 127.0935 },
+    { "region_level1": "서울특별시", "region_level2": "성북구",  "cortar_no": "1129000000", "center_lat": 37.6066, "center_lng": 127.0183 },
+    { "region_level1": "서울특별시", "region_level2": "강북구",  "cortar_no": "1130500000", "center_lat": 37.6396, "center_lng": 127.0253 },
+    { "region_level1": "서울특별시", "region_level2": "도봉구",  "cortar_no": "1132000000", "center_lat": 37.6688, "center_lng": 127.0471 },
+    { "region_level1": "서울특별시", "region_level2": "노원구",  "cortar_no": "1135000000", "center_lat": 37.6542, "center_lng": 127.0568 },
+    { "region_level1": "서울특별시", "region_level2": "은평구",  "cortar_no": "1138000000", "center_lat": 37.6026, "center_lng": 126.9287 },
+    { "region_level1": "서울특별시", "region_level2": "서대문구","cortar_no": "1141000000", "center_lat": 37.5791, "center_lng": 126.9368 },
+    { "region_level1": "서울특별시", "region_level2": "마포구",  "cortar_no": "1144000000", "center_lat": 37.5663, "center_lng": 126.9014 },
+    { "region_level1": "서울특별시", "region_level2": "양천구",  "cortar_no": "1147000000", "center_lat": 37.5170, "center_lng": 126.8665 },
+    { "region_level1": "서울특별시", "region_level2": "강서구",  "cortar_no": "1150000000", "center_lat": 37.5509, "center_lng": 126.8495 },
+    { "region_level1": "서울특별시", "region_level2": "구로구",  "cortar_no": "1153000000", "center_lat": 37.4954, "center_lng": 126.8874 },
+    { "region_level1": "서울특별시", "region_level2": "금천구",  "cortar_no": "1154500000", "center_lat": 37.4566, "center_lng": 126.9000 },
+    { "region_level1": "서울특별시", "region_level2": "영등포구","cortar_no": "1156000000", "center_lat": 37.5264, "center_lng": 126.8963 },
+    { "region_level1": "서울특별시", "region_level2": "동작구",  "cortar_no": "1159000000", "center_lat": 37.5124, "center_lng": 126.9393 },
+    { "region_level1": "서울특별시", "region_level2": "관악구",  "cortar_no": "1162000000", "center_lat": 37.4784, "center_lng": 126.9516 },
+    { "region_level1": "서울특별시", "region_level2": "서초구",  "cortar_no": "1165000000", "center_lat": 37.4837, "center_lng": 127.0325 },
+    { "region_level1": "서울특별시", "region_level2": "강남구",  "cortar_no": "1168000000", "center_lat": 37.5172, "center_lng": 127.0473 },
+    { "region_level1": "서울특별시", "region_level2": "송파구",  "cortar_no": "1171000000", "center_lat": 37.5145, "center_lng": 127.1059 },
+    { "region_level1": "서울특별시", "region_level2": "강동구",  "cortar_no": "1174000000", "center_lat": 37.5301, "center_lng": 127.1238 },
+    { "region_level1": "인천광역시", "region_level2": "중구",    "cortar_no": "2811000000", "center_lat": 37.4734, "center_lng": 126.6219 },
+    { "region_level1": "인천광역시", "region_level2": "동구",    "cortar_no": "2814000000", "center_lat": 37.4739, "center_lng": 126.6435 },
+    { "region_level1": "인천광역시", "region_level2": "미추홀구","cortar_no": "2817700000", "center_lat": 37.4638, "center_lng": 126.6505 },
+    { "region_level1": "인천광역시", "region_level2": "연수구",  "cortar_no": "2818500000", "center_lat": 37.4099, "center_lng": 126.6782 },
+    { "region_level1": "인천광역시", "region_level2": "남동구",  "cortar_no": "2820000000", "center_lat": 37.4470, "center_lng": 126.7310 },
+    { "region_level1": "인천광역시", "region_level2": "부평구",  "cortar_no": "2823700000", "center_lat": 37.5074, "center_lng": 126.7219 },
+    { "region_level1": "인천광역시", "region_level2": "계양구",  "cortar_no": "2824500000", "center_lat": 37.5374, "center_lng": 126.7376 },
+    { "region_level1": "인천광역시", "region_level2": "서구",    "cortar_no": "2826000000", "center_lat": 37.5449, "center_lng": 126.6757 },
+    { "region_level1": "인천광역시", "region_level2": "강화군",  "cortar_no": "2871000000", "center_lat": 37.7479, "center_lng": 126.4877 },
+    { "region_level1": "인천광역시", "region_level2": "옹진군",  "cortar_no": "2872000000", "center_lat": 37.4323, "center_lng": 126.3551 },
+    { "region_level1": "경기도", "region_level2": "수원시",  "cortar_no": "4111000000", "center_lat": 37.2636, "center_lng": 127.0286 },
+    { "region_level1": "경기도", "region_level2": "성남시",  "cortar_no": "4113000000", "center_lat": 37.4449, "center_lng": 127.1389 },
+    { "region_level1": "경기도", "region_level2": "의정부시","cortar_no": "4115000000", "center_lat": 37.7381, "center_lng": 127.0338 },
+    { "region_level1": "경기도", "region_level2": "안양시",  "cortar_no": "4117000000", "center_lat": 37.3943, "center_lng": 126.9568 },
+    { "region_level1": "경기도", "region_level2": "부천시",  "cortar_no": "4119000000", "center_lat": 37.5035, "center_lng": 126.7660 },
+    { "region_level1": "경기도", "region_level2": "광명시",  "cortar_no": "4121000000", "center_lat": 37.4784, "center_lng": 126.8643 },
+    { "region_level1": "경기도", "region_level2": "평택시",  "cortar_no": "4122000000", "center_lat": 36.9921, "center_lng": 127.1127 },
+    { "region_level1": "경기도", "region_level2": "동두천시","cortar_no": "4125000000", "center_lat": 37.9036, "center_lng": 127.0606 },
+    { "region_level1": "경기도", "region_level2": "안산시",  "cortar_no": "4127000000", "center_lat": 37.3219, "center_lng": 126.8309 },
+    { "region_level1": "경기도", "region_level2": "고양시",  "cortar_no": "4128000000", "center_lat": 37.6584, "center_lng": 126.8320 },
+    { "region_level1": "경기도", "region_level2": "과천시",  "cortar_no": "4129000000", "center_lat": 37.4292, "center_lng": 126.9878 },
+    { "region_level1": "경기도", "region_level2": "구리시",  "cortar_no": "4131000000", "center_lat": 37.5943, "center_lng": 127.1297 },
+    { "region_level1": "경기도", "region_level2": "남양주시","cortar_no": "4136000000", "center_lat": 37.6360, "center_lng": 127.2165 },
+    { "region_level1": "경기도", "region_level2": "오산시",  "cortar_no": "4137000000", "center_lat": 37.1499, "center_lng": 127.0771 },
+    { "region_level1": "경기도", "region_level2": "시흥시",  "cortar_no": "4139000000", "center_lat": 37.3800, "center_lng": 126.8030 },
+    { "region_level1": "경기도", "region_level2": "군포시",  "cortar_no": "4141000000", "center_lat": 37.3614, "center_lng": 126.9352 },
+    { "region_level1": "경기도", "region_level2": "의왕시",  "cortar_no": "4143000000", "center_lat": 37.3448, "center_lng": 126.9681 },
+    { "region_level1": "경기도", "region_level2": "하남시",  "cortar_no": "4145000000", "center_lat": 37.5400, "center_lng": 127.2147 },
+    { "region_level1": "경기도", "region_level2": "용인시",  "cortar_no": "4146000000", "center_lat": 37.2411, "center_lng": 127.1776 },
+    { "region_level1": "경기도", "region_level2": "파주시",  "cortar_no": "4148000000", "center_lat": 37.7599, "center_lng": 126.7800 },
+    { "region_level1": "경기도", "region_level2": "이천시",  "cortar_no": "4150000000", "center_lat": 37.2720, "center_lng": 127.4345 },
+    { "region_level1": "경기도", "region_level2": "안성시",  "cortar_no": "4155000000", "center_lat": 37.0078, "center_lng": 127.2797 },
+    { "region_level1": "경기도", "region_level2": "김포시",  "cortar_no": "4157000000", "center_lat": 37.6153, "center_lng": 126.7157 },
+    { "region_level1": "경기도", "region_level2": "화성시",  "cortar_no": "4159000000", "center_lat": 37.1998, "center_lng": 126.8318 },
+    { "region_level1": "경기도", "region_level2": "광주시",  "cortar_no": "4161000000", "center_lat": 37.4296, "center_lng": 127.2553 },
+    { "region_level1": "경기도", "region_level2": "양주시",  "cortar_no": "4163000000", "center_lat": 37.7852, "center_lng": 127.0456 },
+    { "region_level1": "경기도", "region_level2": "포천시",  "cortar_no": "4165000000", "center_lat": 37.8949, "center_lng": 127.2003 },
+    { "region_level1": "경기도", "region_level2": "여주시",  "cortar_no": "4167000000", "center_lat": 37.2983, "center_lng": 127.6377 },
+    { "region_level1": "경기도", "region_level2": "연천군",  "cortar_no": "4180000000", "center_lat": 38.0961, "center_lng": 127.0748 },
+    { "region_level1": "경기도", "region_level2": "가평군",  "cortar_no": "4182000000", "center_lat": 37.8314, "center_lng": 127.5108 },
+    { "region_level1": "경기도", "region_level2": "양평군",  "cortar_no": "4183000000", "center_lat": 37.4916, "center_lng": 127.4875 }
   ]
 }
