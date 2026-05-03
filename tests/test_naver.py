@@ -120,9 +120,9 @@ class TestNaverScraper:
 
         request = route.calls.last.request
         url_str = str(request.url)
-        assert "tradTpCd=A1" in url_str
+        assert "tradeType=A1" in url_str
         assert "cortarNo=1123000000" in url_str
-        assert "rletTypeCd=A01" in url_str
+        assert "realEstateType=APT" in url_str
 
     def test_invalid_trade_type_raises(self, scraper):
         with pytest.raises(ValueError, match="지원하지 않는"):

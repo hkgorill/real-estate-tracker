@@ -23,7 +23,7 @@ jobs:
   collect:
     name: 매물 수집 및 Sheets 적재
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     steps:
       - name: 코드 체크아웃
@@ -43,6 +43,11 @@ jobs:
         with:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Sheets 시트 초기화 (최초 실행 시 헤더 생성)
+        env:
+          GOOGLE_SHEETS_ID: ${{ secrets.GOOGLE_SHEETS_ID }}
+        run: python setup_sheets.py
 
       - name: 매물 수집 및 Sheets 적재
         env:
