@@ -1,13 +1,22 @@
 """
-수도권 아파트 잔여 매물 수집 메인 진입점.
+부동산 시장 지표 자동 수집 메인 진입점.
+
+수집 대상 (4종):
+  R-ONE  → 아파트 매매·전세 가격지수, 전세가율 (주간)
+  ECOS   → 기준금리, 주담대금리 (월간)
+  MOLIT  → 아파트 실거래가 (월간, 시군구별)
+  MOLIT  → 미분양주택 현황 (월간, 시도별)
 
 사용법:
-  python collect.py                  # 전체 수집
-  python collect.py --region 강남구  # 특정 구만 수집
-  python collect.py --dry-run        # API 호출 없이 구조 검증
-  python collect.py --csv            # CSV로 로컬 저장 (디버그)
-  python collect.py --source naver   # 소스 강제 지정 (zigbang|naver)
-  python collect.py --no-sheets      # Google Sheets 적재 생략
+  python collect.py                          # 전체 수집 (이번 주 R-ONE + 전월 MOLIT)
+  python collect.py --source rbone           # R-ONE만
+  python collect.py --source ecos            # ECOS만
+  python collect.py --source molit           # MOLIT 실거래가+미분양만
+  python collect.py --deal-ym 202503         # 특정 거래년월 지정 (MOLIT용)
+  python collect.py --week 202520            # 특정 주차 지정 (R-ONE용, YYYYWW)
+  python collect.py --csv                    # 로컬 CSV 저장 (디버그)
+  python collect.py --no-sheets              # Sheets 적재 생략
+  python collect.py --dry-run                # API 호출 없이 수집 계획 출력
 """
 
 import argparse
@@ -22,9 +31,12 @@ from pathlib import Path
 from dotenv import load_dotenv
 from loguru import logger
 
-from scrapers.zigbang import ZigbangScraper
-from scrapers.naver import NaverScraper
-from transform import normalize, to_csv_rows
+from transform import (
+    CollectResult,
+    normalize_price_index,
+    normalize_interest_rate, normalize_apt_trade, normalize_unsold,
+    to_csv_rows,
+)
 
 load_dotenv()
 
@@ -32,177 +44,244 @@ KST = timezone(timedelta(hours=9))
 REGIONS_PATH = Path(__file__).parent / "data" / "regions.json"
 
 
+# ── 날짜 헬퍼 ──────────────────────────────────────────────────────────────────
+
+def _now_kst() -> datetime:
+    return datetime.now(KST)
+
+
+def _prev_month_ym(dt: datetime) -> str:
+    """전월 YYYYMM 반환."""
+    first = dt.replace(day=1)
+    prev = first - timedelta(days=1)
+    return prev.strftime("%Y%m")
+
+
+def _current_week(dt: datetime) -> str:
+    """현재 주차 YYYYWW 반환 (ISO 주차)."""
+    return f"{dt.isocalendar()[0]}{dt.isocalendar()[1]:02d}"
+
+
+# ── 지역 로드 ──────────────────────────────────────────────────────────────────
+
 def load_regions(region_filter: str | None = None) -> list[dict]:
     with open(REGIONS_PATH, encoding="utf-8") as f:
         data = json.load(f)
     regions = data["regions"]
     if region_filter:
-        regions = [r for r in regions if region_filter in (r["region_level1"] + r["region_level2"])]
+        regions = [
+            r for r in regions
+            if region_filter in (r["region_level1"] + r["region_level2"])
+        ]
     return regions
 
 
-def scrape_with_fallback(
-    regions: list[dict],
-    source: str = "auto",
-    delay_min: float = 1.0,
-    delay_max: float = 3.0,
-    timeout: float = 30.0,
-) -> list:
-    """
-    직방 우선, 실패 시 네이버로 fallback하여 수집한다.
-    source="auto"  → 직방 먼저, 지역별로 실패하면 네이버 fallback
-    source="zigbang" → 직방만
-    source="naver"   → 네이버만
-    """
-    all_results = []
-    total = len(regions)
+# ── 수집 함수 ──────────────────────────────────────────────────────────────────
 
-    zigbang = ZigbangScraper(delay_min, delay_max, timeout) if source in ("auto", "zigbang") else None
-    naver = NaverScraper(delay_min, delay_max, timeout) if source in ("auto", "naver") else None
+def collect_rbone(result: CollectResult, week: str):
+    """R-ONE에서 주간 가격지수 + 전세가율을 수집한다."""
+    api_key = os.getenv("RBONE_API_KEY")
+    if not api_key:
+        logger.warning("[rbone] RBONE_API_KEY 미설정 — 건너뜀")
+        return
 
+    from scrapers.rbone import RboneScraper
+    logger.info("[rbone] 주차 {} 수집 시작", week)
     try:
-        for i, region in enumerate(regions, 1):
-            name = f"{region['region_level1']} {region['region_level2']}"
-            logger.info("[{}/{}] 수집 중: {}", i, total, name)
-
-            if source == "naver":
-                results = naver.scrape_region(region)
-            elif source == "zigbang":
-                results = zigbang.scrape_region(region)
-            else:
-                # auto: 직방 시도 후, 오류가 있으면 네이버로 보완
-                results = zigbang.scrape_region(region)
-                failed = [r for r in results if "error" in r.source]
-                if failed:
-                    logger.info("[fallback] {} 네이버로 재수집 ({} 오류)", name, len(failed))
-                    failed_types = [r.trade_type for r in failed]
-                    naver_results = naver.scrape_region(region, trade_types=failed_types)
-                    # 실패한 거래유형을 네이버 결과로 교체
-                    naver_by_type = {r.trade_type: r for r in naver_results}
-                    results = [
-                        naver_by_type.get(r.trade_type, r) if "error" in r.source else r
-                        for r in results
-                    ]
-
-            all_results.extend(results)
-
-    finally:
-        if zigbang:
-            zigbang.close()
-        if naver:
-            naver.close()
-
-    return all_results
+        with RboneScraper(api_key) as sc:
+            indices = sc.get_latest(week)
+        result.price_index_rows.extend(normalize_price_index(indices))
+        result.sources_used.append("rbone")
+        logger.info("[rbone] 완료 — 가격지수 {}건 (jeonse_idx_ratio 파생 포함)", len(indices))
+    except Exception as exc:
+        logger.error("[rbone] 수집 실패: {}", exc)
+        result.error_count += 1
 
 
-def save_csv(result, output_dir: str = "./output"):
+def collect_ecos(result: CollectResult, year_month: str):
+    """ECOS에서 월간 금리를 수집한다.
+
+    ECOS 월간 데이터는 보통 1~2달 후 집계되므로,
+    요청한 월에 데이터가 없으면 최대 3개월 전까지 소급한다.
+    """
+    api_key = os.getenv("ECOS_API_KEY")
+    if not api_key:
+        logger.warning("[ecos] ECOS_API_KEY 미설정 — 건너뜀")
+        return
+
+    from scrapers.ecos import EcosScraper
+
+    def _prev_ym(ym: str) -> str:
+        y, m = int(ym[:4]), int(ym[4:])
+        m -= 1
+        if m == 0:
+            y, m = y - 1, 12
+        return f"{y}{m:02d}"
+
+    target = year_month
+    with EcosScraper(api_key) as sc:
+        for attempt in range(4):
+            logger.info("[ecos] {} 금리 수집 시작", target)
+            try:
+                rates = sc.get_interest_rates(target, target)
+                if rates:
+                    result.interest_rate_rows.extend(normalize_interest_rate(rates))
+                    result.sources_used.append("ecos")
+                    if attempt > 0:
+                        logger.info("[ecos] {} 데이터 없음 → {} 소급 수집 완료", year_month, target)
+                    else:
+                        logger.info("[ecos] 완료 — {}건", len(rates))
+                    return
+                logger.warning("[ecos] {} 데이터 없음, 이전 월 재시도", target)
+            except Exception as exc:
+                if "데이터가 없습니다" in str(exc):
+                    logger.warning("[ecos] {} 데이터 없음, 이전 월 재시도", target)
+                else:
+                    logger.error("[ecos] 수집 실패: {}", exc)
+                    result.error_count += 1
+                    return
+            target = _prev_ym(target)
+
+    logger.error("[ecos] {} 포함 최근 4개월 데이터 없음", year_month)
+    result.error_count += 1
+
+
+def collect_molit(result: CollectResult, deal_ym: str, regions: list[dict]):
+    """MOLIT에서 실거래가 + 미분양을 수집한다."""
+    api_key = os.getenv("DATA_GO_KR_API_KEY")
+    if not api_key:
+        logger.warning("[molit] DATA_GO_KR_API_KEY 미설정 — 건너뜀")
+        return
+
+    from scrapers.molit import MolitScraper
+    logger.info("[molit] {} 수집 시작 ({} 개 시군구)", deal_ym, len(regions))
+    try:
+        with MolitScraper(api_key) as sc:
+            trades = sc.scrape_all_trades(regions, deal_ym)
+            unsold = sc.get_unsold(deal_ym)
+        result.apt_trade_rows.extend(normalize_apt_trade(trades))
+        result.unsold_rows.extend(normalize_unsold(unsold))
+        result.sources_used.append("molit")
+        logger.info("[molit] 완료 — 실거래가 {}건, 미분양 {}건", len(trades), len(unsold))
+    except Exception as exc:
+        logger.error("[molit] 수집 실패: {}", exc)
+        result.error_count += 1
+
+
+# ── CSV 저장 ───────────────────────────────────────────────────────────────────
+
+def save_csv(result: CollectResult, output_dir: str = "./output"):
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     tables = to_csv_rows(result)
+    timestamp = _now_kst().strftime("%Y%m%d_%H%M%S")
     for sheet_name, rows in tables.items():
-        path = Path(output_dir) / f"{result.date}_{sheet_name}.csv"
+        if len(rows) <= 1:
+            continue
+        path = Path(output_dir) / f"{timestamp}_{sheet_name}.csv"
         with open(path, "w", newline="", encoding="utf-8-sig") as f:
             writer = csv.writer(f)
             writer.writerows(rows)
         logger.info("CSV 저장: {}", path)
 
 
-def _write_to_sheets(result, elapsed: float, source: str):
+# ── Sheets 적재 ────────────────────────────────────────────────────────────────
+
+def write_to_sheets(result: CollectResult, elapsed: float):
     from auth import get_sheets_service
     from writer import SheetsWriter, RunLogRow
 
     sheets_id = os.getenv("GOOGLE_SHEETS_ID")
     error_rate = result.error_count / max(result.total_rows, 1)
-    status = "success" if result.error_count == 0 else ("failed" if error_rate >= 0.5 else "partial")
-
+    status = "success" if result.error_count == 0 else (
+        "failed" if error_rate >= 0.5 else "partial"
+    )
     log_row = RunLogRow(
         run_at=result.collected_at,
         status=status,
         total_rows=result.total_rows,
         error_count=result.error_count,
-        source_used=source,
+        sources_used=",".join(result.sources_used),
         duration_sec=elapsed,
     )
+    service = get_sheets_service()
+    writer = SheetsWriter(service, sheets_id)
+    writer.write(result, log_row)
+    logger.info("Google Sheets 적재 완료")
 
-    try:
-        service = get_sheets_service()
-        writer = SheetsWriter(service, sheets_id)
-        writer.write(result, log_row)
-        logger.info("Google Sheets 적재 완료")
-    except Exception as exc:
-        logger.error("Google Sheets 적재 실패: {}", exc)
-        raise
 
+# ── CLI ────────────────────────────────────────────────────────────────────────
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="수도권 아파트 잔여 매물 수집")
-    parser.add_argument("--region", help="수집할 지역 필터 (예: 강남구, 서울)")
-    parser.add_argument("--source", choices=["auto", "zigbang", "naver"], default="auto")
-    parser.add_argument("--csv", action="store_true", help="로컬 CSV로 저장")
-    parser.add_argument("--dry-run", action="store_true", help="실제 API 호출 없이 지역 목록만 출력")
-    parser.add_argument("--no-sheets", action="store_true", help="Google Sheets 적재 생략")
-    parser.add_argument("--delay-min", type=float, default=float(os.getenv("REQUEST_DELAY_MIN", "1.0")))
-    parser.add_argument("--delay-max", type=float, default=float(os.getenv("REQUEST_DELAY_MAX", "3.0")))
-    parser.add_argument("--timeout", type=float, default=float(os.getenv("REQUEST_TIMEOUT", "30")))
+    parser = argparse.ArgumentParser(description="부동산 시장 지표 수집")
+    parser.add_argument(
+        "--source",
+        choices=["all", "rbone", "ecos", "molit"],
+        default="all",
+        help="수집할 소스 (기본: all)",
+    )
+    parser.add_argument("--deal-ym", default=None, help="MOLIT 거래년월 (YYYYMM, 기본: 전월)")
+    parser.add_argument("--week", default=None, help="R-ONE 주차 (YYYYWW, 기본: 현재 주차)")
+    parser.add_argument("--region", default=None, help="지역 필터 (예: 강남구, 서울)")
+    parser.add_argument("--csv", action="store_true", help="로컬 CSV 저장")
+    parser.add_argument("--no-sheets", action="store_true", help="Sheets 적재 생략")
+    parser.add_argument("--dry-run", action="store_true", help="수집 계획만 출력")
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
-
-    log_level = os.getenv("LOG_LEVEL", "INFO")
     logger.remove()
-    logger.add(sys.stderr, level=log_level, colorize=True)
+    logger.add(sys.stderr, level=os.getenv("LOG_LEVEL", "INFO"), colorize=True)
 
+    now = _now_kst()
+    deal_ym = args.deal_ym or _prev_month_ym(now)
+    week = args.week or _current_week(now)
     regions = load_regions(args.region)
-    logger.info("대상 지역: {}개", len(regions))
 
     if args.dry_run:
-        for r in regions:
-            print(f"  {r['region_level1']} {r['region_level2']} (cortarNo={r['cortar_no']})")
-        print(f"\n총 {len(regions)}개 지역 × 3 거래유형 = {len(regions) * 3}건 수집 예정")
+        print(f"수집 계획 (dry-run)")
+        print(f"  R-ONE 주차:   {week}")
+        print(f"  MOLIT 거래월:  {deal_ym}")
+        print(f"  대상 지역:    {len(regions)}개 시군구")
+        print(f"  소스:         {args.source}")
         return
 
+    logger.info("=== 수집 시작 source={} deal_ym={} week={} ===", args.source, deal_ym, week)
     start = time.time()
-    scraper_results = scrape_with_fallback(
-        regions,
-        source=args.source,
-        delay_min=args.delay_min,
-        delay_max=args.delay_max,
-        timeout=args.timeout,
-    )
+    result = CollectResult(collected_at=now.strftime("%Y-%m-%d %H:%M:%S"))
+    run_all = args.source == "all"
 
-    result = normalize(scraper_results)
+    if run_all or args.source == "rbone":
+        collect_rbone(result, week)
+    if run_all or args.source == "ecos":
+        collect_ecos(result, deal_ym)
+    if run_all or args.source == "molit":
+        collect_molit(result, deal_ym, regions)
+
+    result.recount()
     elapsed = time.time() - start
-
     logger.info(
-        "수집 완료: 총 {}행, 오류 {}건, 소요 {:.1f}초",
-        result.total_rows,
-        result.error_count,
-        elapsed,
+        "=== 수집 완료: 총 {}행, 오류 {}건, 소요 {:.1f}초 ===",
+        result.total_rows, result.error_count, elapsed,
     )
 
     if args.csv or os.getenv("OUTPUT_CSV", "").lower() == "true":
         save_csv(result, os.getenv("OUTPUT_CSV_PATH", "./output"))
 
-    # Google Sheets 적재
     skip_sheets = args.no_sheets or not os.getenv("GOOGLE_SHEETS_ID")
     if skip_sheets:
         if not args.no_sheets:
             logger.info("GOOGLE_SHEETS_ID 미설정 → Sheets 적재 생략")
     else:
-        _write_to_sheets(result, elapsed, args.source)
+        try:
+            write_to_sheets(result, elapsed)
+        except Exception as exc:
+            logger.error("Sheets 적재 실패: {}", exc)
+            sys.exit(1)
 
-    if result.error_count > 0:
-        logger.warning(
-            "{}개 항목 수집 실패 (전체 {}개 중)",
-            result.error_count,
-            result.total_rows,
-        )
-
-    # GitHub Actions에서 오류율이 20% 이상이면 exit code 1
     error_rate = result.error_count / max(result.total_rows, 1)
     if error_rate >= 0.20:
-        logger.error("오류율 {:.1%}로 임계값 초과, 실패 종료", error_rate)
+        logger.error("오류율 {:.1%} 임계값 초과", error_rate)
         sys.exit(1)
 
 

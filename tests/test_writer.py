@@ -1,204 +1,101 @@
 """writer.py 단위 테스트 (Google Sheets API mock)."""
 
 from datetime import datetime, timezone, timedelta
-from dataclasses import dataclass
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock
 
 import pytest
 
-from transform import normalize, RawRow, SummaryRow, TransformResult
+from transform import CollectResult, PriceIndexRow, InterestRateRow, UnsoldRow
 from writer import SheetsWriter, RunLogRow
 
 KST = timezone(timedelta(hours=9))
-FIXED_DT = datetime(2026, 5, 3, 4, 0, 0, tzinfo=KST)
 SPREADSHEET_ID = "fake_spreadsheet_id"
 
 
-@dataclass
-class FakeResult:
-    region_level1: str
-    region_level2: str
-    trade_type: str
-    listing_count: int
-    source: str = "naver"
-
-
-def make_transform_result(date="2026-05-03") -> TransformResult:
-    inputs = [
-        FakeResult("서울특별시", "강남구", "매매", 100),
-        FakeResult("서울특별시", "강남구", "전세", 50),
-        FakeResult("서울특별시", "강남구", "월세", 30),
-        FakeResult("경기도", "수원시", "매매", 200),
-        FakeResult("경기도", "수원시", "전세", 80),
-        FakeResult("경기도", "수원시", "월세", 40),
-    ]
-    return normalize(inputs, collected_at=FIXED_DT)
-
-
-def make_mock_service(existing_raw_rows=None, existing_summary_rows=None):
-    """Sheets API 서비스 mock을 생성한다."""
-    service = MagicMock()
-    spreadsheets = service.spreadsheets.return_value
-
-    # get() — 시트 목록 (sheet_id 조회용)
-    spreadsheets.get.return_value.execute.return_value = {
+def make_mock_service(existing_values=None):
+    svc = MagicMock()
+    # spreadsheets().get() → sheet metadata
+    svc.spreadsheets().get().execute.return_value = {
         "sheets": [
-            {"properties": {"title": "raw_data", "sheetId": 1}},
-            {"properties": {"title": "summary", "sheetId": 2}},
-            {"properties": {"title": "run_log", "sheetId": 3}},
+            {"properties": {"title": "price_index",   "sheetId": 1}},
+            {"properties": {"title": "jeonse_ratio",  "sheetId": 2}},
+            {"properties": {"title": "interest_rate", "sheetId": 3}},
+            {"properties": {"title": "apt_trade",     "sheetId": 4}},
+            {"properties": {"title": "unsold",        "sheetId": 5}},
+            {"properties": {"title": "run_log",       "sheetId": 6}},
         ]
     }
-
-    # values().get() — 기존 데이터 조회
-    raw_header = [RawRow.headers()]
-    summary_header = [SummaryRow.headers()]
-
-    def values_get_side_effect(spreadsheetId, range):
-        if "raw_data" in range:
-            rows = raw_header + (existing_raw_rows or [])
-        elif "summary" in range:
-            rows = summary_header + (existing_summary_rows or [])
-        else:
-            rows = []
-        mock = MagicMock()
-        mock.execute.return_value = {"values": rows}
-        return mock
-
-    spreadsheets.values.return_value.get.side_effect = values_get_side_effect
-
-    # values().append(), batchUpdate() — 쓰기 작업
-    spreadsheets.values.return_value.append.return_value.execute.return_value = {}
-    spreadsheets.batchUpdate.return_value.execute.return_value = {"replies": []}
-
-    return service
-
-
-class TestSheetsWriterUpsertRawData:
-    def test_appends_rows_when_no_existing(self):
-        service = make_mock_service()
-        writer = SheetsWriter(service, SPREADSHEET_ID)
-        result = make_transform_result()
-
-        writer.upsert_raw_data(result)
-
-        append_mock = service.spreadsheets.return_value.values.return_value.append
-        assert append_mock.called
-        appended_values = append_mock.call_args[1]["body"]["values"]
-        assert len(appended_values) == 6
-
-    def test_deletes_existing_rows_before_append(self):
-        # 기존에 동일 날짜 데이터 3행 존재
-        existing = [
-            ["2026-05-03 04:00:00", "2026-05-03", "서울특별시", "강남구", "매매", "99", "naver", "ok", ""],
-            ["2026-05-03 04:00:00", "2026-05-03", "서울특별시", "강남구", "전세", "49", "naver", "ok", ""],
-            ["2026-05-03 04:00:00", "2026-05-03", "서울특별시", "강남구", "월세", "29", "naver", "ok", ""],
-        ]
-        service = make_mock_service(existing_raw_rows=existing)
-        writer = SheetsWriter(service, SPREADSHEET_ID)
-        result = make_transform_result()
-
-        writer.upsert_raw_data(result)
-
-        # batchUpdate(deleteDimension)이 호출됐는지 확인
-        assert service.spreadsheets.return_value.batchUpdate.called
-
-    def test_no_delete_when_different_date(self):
-        # 다른 날짜의 기존 데이터
-        existing = [
-            ["2026-05-02 04:00:00", "2026-05-02", "서울특별시", "강남구", "매매", "99", "naver", "ok", ""],
-        ]
-        service = make_mock_service(existing_raw_rows=existing)
-        writer = SheetsWriter(service, SPREADSHEET_ID)
-        result = make_transform_result()
-
-        writer.upsert_raw_data(result)
-
-        # batchUpdate(delete)가 호출되지 않아야 함
-        assert not service.spreadsheets.return_value.batchUpdate.called
-
-
-class TestSheetsWriterUpsertSummary:
-    def test_appends_summary_rows(self):
-        service = make_mock_service()
-        writer = SheetsWriter(service, SPREADSHEET_ID)
-        result = make_transform_result()
-
-        writer.upsert_summary(result)
-
-        append_mock = service.spreadsheets.return_value.values.return_value.append
-        assert append_mock.called
-        appended_values = append_mock.call_args[1]["body"]["values"]
-        assert len(appended_values) == 2  # 강남구, 수원시
-
-    def test_deletes_existing_summary_rows(self):
-        existing = [
-            ["2026-05-03", "서울특별시", "강남구", "99", "49", "29", "177"],
-        ]
-        service = make_mock_service(existing_summary_rows=existing)
-        writer = SheetsWriter(service, SPREADSHEET_ID)
-        result = make_transform_result()
-
-        writer.upsert_summary(result)
-
-        assert service.spreadsheets.return_value.batchUpdate.called
-
-
-class TestSheetsWriterRunLog:
-    def test_appends_run_log(self):
-        service = make_mock_service()
-        writer = SheetsWriter(service, SPREADSHEET_ID)
-        log = RunLogRow(
-            run_at="2026-05-03 04:01:23",
-            status="success",
-            total_rows=183,
-            error_count=0,
-            source_used="zigbang",
-            duration_sec=47.3,
-        )
-
-        writer.append_run_log(log)
-
-        append_mock = service.spreadsheets.return_value.values.return_value.append
-        assert append_mock.called
-        row = append_mock.call_args[1]["body"]["values"][0]
-        assert row[0] == "2026-05-03 04:01:23"
-        assert row[1] == "success"
-        assert row[2] == 183
-        assert row[5] == 47.3
+    # spreadsheets().values().get() → existing row data
+    vals = existing_values or []
+    svc.spreadsheets().values().get().execute.return_value = {"values": vals}
+    # append / batchUpdate return empty
+    svc.spreadsheets().values().append().execute.return_value = {}
+    svc.spreadsheets().batchUpdate().execute.return_value = {"replies": []}
+    return svc
 
 
 class TestRunLogRow:
-    def test_to_row_format(self):
-        log = RunLogRow(
-            run_at="2026-05-03 04:01:23",
-            status="partial",
-            total_rows=180,
-            error_count=3,
-            source_used="naver",
-            duration_sec=55.678,
+    def test_to_row(self):
+        row = RunLogRow(
+            run_at="2025-05-03 04:00:00",
+            status="success",
+            total_rows=100,
+            error_count=0,
+            sources_used="rbone,ecos,molit",
+            duration_sec=42.5,
         )
-        row = log.to_row()
-        assert len(row) == 6
-        assert row[1] == "partial"
-        assert row[5] == 55.7  # rounded
+        data = row.to_row()
+        assert data[0] == "2025-05-03 04:00:00"
+        assert data[1] == "success"
+        assert data[2] == 100
+        assert data[3] == 0
+        assert data[4] == "rbone,ecos,molit"
+        assert data[5] == 42.5
 
-    def test_duration_rounded(self):
-        log = RunLogRow("t", "success", 10, 0, "zigbang", 12.3456789)
-        assert log.to_row()[5] == 12.3
+    def test_headers_length(self):
+        assert len(RunLogRow.headers()) == 6
 
 
-class TestSheetsWriterWriteAll:
-    def test_write_calls_all_three(self):
-        service = make_mock_service()
-        writer = SheetsWriter(service, SPREADSHEET_ID)
-        result = make_transform_result()
-        log = RunLogRow("2026-05-03 04:01:23", "success", 6, 0, "naver", 10.0)
+class TestSheetsWriterUpsert:
+    def test_upsert_appends_when_no_existing(self):
+        svc = make_mock_service(existing_values=[["collected_at", "period", "region", "sale_index", "jeonse_index", "jeonse_idx_ratio", "source"]])
+        writer = SheetsWriter(svc, SPREADSHEET_ID)
+        rows = [PriceIndexRow("2025-05-03 04:00:00", "202518", "전국", 100.0, 99.0, 99.0, "rbone")]
+        writer.upsert_price_index(rows, "202518")
+        svc.spreadsheets().values().append.assert_called()
 
-        with patch.object(writer, "upsert_raw_data") as mock_raw, \
-             patch.object(writer, "upsert_summary") as mock_summary, \
-             patch.object(writer, "append_run_log") as mock_log:
-            writer.write(result, log)
+    def test_upsert_deletes_existing_then_appends(self):
+        existing = [
+            ["collected_at", "period", "region", "sale_index", "jeonse_index", "jeonse_idx_ratio", "source"],
+            ["2025-05-02 04:00:00", "202518", "전국", "99.0", "98.0", "98.99", "rbone"],
+        ]
+        svc = make_mock_service(existing_values=existing)
+        writer = SheetsWriter(svc, SPREADSHEET_ID)
+        rows = [PriceIndexRow("2025-05-03 04:00:00", "202518", "전국", 100.0, 99.0, 99.0, "rbone")]
+        writer.upsert_price_index(rows, "202518")
+        # batchUpdate(삭제) 호출 확인
+        svc.spreadsheets().batchUpdate.assert_called()
 
-        mock_raw.assert_called_once_with(result)
-        mock_summary.assert_called_once_with(result)
-        mock_log.assert_called_once_with(log)
+    def test_append_run_log(self):
+        svc = make_mock_service()
+        writer = SheetsWriter(svc, SPREADSHEET_ID)
+        log = RunLogRow("2025-05-03 04:00:00", "success", 50, 0, "rbone,ecos", 30.0)
+        writer.append_run_log(log)
+        svc.spreadsheets().values().append.assert_called()
+
+
+class TestSheetsWriterWrite:
+    def test_write_calls_all_upserts(self):
+        svc = make_mock_service()
+        writer = SheetsWriter(svc, SPREADSHEET_ID)
+
+        result = CollectResult(collected_at="2025-05-03 04:00:00")
+        result.price_index_rows = [PriceIndexRow("ts", "202518", "전국", 100.0, 99.0, 99.0, "rbone")]
+        result.interest_rate_rows = [InterestRateRow("ts", "202503", 2.75, 4.10, "ecos")]
+        result.unsold_rows = [UnsoldRow("ts", "202503", "서울특별시", 100, 60, 40, "molit_unsold")]
+
+        log = RunLogRow("2025-05-03 04:00:00", "success", 3, 0, "rbone,ecos,molit", 15.0)
+        writer.write(result, log)
+
+        # append가 최소 3번 이상 호출 (price_index, interest_rate, unsold, run_log)
+        assert svc.spreadsheets().values().append.call_count >= 3
