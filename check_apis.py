@@ -126,45 +126,29 @@ def check_rbone():
 
 
 def check_rbone_raw():
-    """R-ONE 요청 URL을 출력하고 원본 응답을 보여준다."""
+    """R-ONE 요청 URL을 출력하고 원본 응답(첫 500자)을 보여준다."""
     api_key = os.getenv("RBONE_API_KEY")
     if not api_key:
         return
 
-    import httpx
-    from scrapers.rbone import RBONE_API_URL, DEFAULT_SALE_IDX_CODE, DEFAULT_ITEM_CODE
-
-    # 브라우저로 직접 테스트할 수 있는 URL 출력
     import urllib.parse
+    import httpx
+    from scrapers.rbone import RBONE_DATA_URL, DEFAULT_SALE_IDX_CODE
+
     params = {
-        "apiKey": api_key,
-        "statsCode": DEFAULT_SALE_IDX_CODE,
-        "prdSe": "W",
-        "startPrdDe": "202518",
-        "endPrdDe": "202518",
-        "항목코드": DEFAULT_ITEM_CODE,
+        "apiKey":           api_key,
+        "STATBL_ID":        DEFAULT_SALE_IDX_CODE,
+        "DTACYCLE_CD":      "WK",
+        "WRTTIME_IDTFR_ID": "202518",
     }
-    full_url = RBONE_API_URL + "?" + urllib.parse.urlencode(params, encoding="utf-8")
+    full_url = RBONE_DATA_URL + "?" + urllib.parse.urlencode(params, encoding="utf-8")
     logger.info("R-ONE 테스트 URL (브라우저에서 직접 확인 가능):")
     logger.info("  {}", full_url)
 
-    logger.info("R-ONE 원본 응답 (첫 500자):")
     try:
-        resp = httpx.get(RBONE_API_URL, params=params, timeout=15, follow_redirects=True)
+        resp = httpx.get(RBONE_DATA_URL, params=params, timeout=15, follow_redirects=True)
         logger.info("  HTTP 상태: {}", resp.status_code)
         logger.info("  응답 내용: {}", resp.text[:500] if resp.text else "(빈 응답)")
-        resp.raise_for_status()
-        data = resp.json()
-
-        if "SttsService" in data:
-            items = data["SttsService"].get("list", [])[:2]
-            for i, item in enumerate(items):
-                logger.info(f"  행 {i+1}: {item}")
-            if not items:
-                logger.warning("  list가 비어있습니다. 통계코드를 확인하세요.")
-        else:
-            logger.error(f"  예상치 못한 응답 구조: {list(data.keys())}")
-            logger.error(f"  전체 응답: {data}")
     except Exception as e:
         logger.error(f"  원본 응답 확인 실패: {e}")
 
