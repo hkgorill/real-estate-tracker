@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
-from scrapers.rbone import PriceIndexResult, JeonseRatioResult
+from scrapers.rbone import PriceIndexResult
 from scrapers.ecos import InterestRateResult
 from scrapers.molit import AptTradeItem, UnsoldItem
 
@@ -26,38 +26,29 @@ def _now_kst() -> datetime:
 
 @dataclass
 class PriceIndexRow:
-    """price_index 시트 한 행."""
+    """price_index 시트 한 행.
+
+    jeonse_idx_ratio = jeonse_index / sale_index × 100
+      → 두 지수가 같은 기준시점을 공유하므로 비율의 방향성은 실제 전세가율 추이와 일치.
+         단, 절대값은 실제 전세가율(전세실거래가/매매실거래가)과 다름.
+    """
     collected_at: str
-    period: str         # YYYYWW
+    period: str              # YYYYWW
     region: str
     sale_index: float
     jeonse_index: float
+    jeonse_idx_ratio: float  # 전세/매매 지수 비율 (파생값)
     source: str
 
     def to_row(self) -> list[Any]:
         return [self.collected_at, self.period, self.region,
-                self.sale_index, self.jeonse_index, self.source]
+                self.sale_index, self.jeonse_index,
+                round(self.jeonse_idx_ratio, 2), self.source]
 
     @classmethod
     def headers(cls) -> list[str]:
-        return ["collected_at", "period", "region", "sale_index", "jeonse_index", "source"]
-
-
-@dataclass
-class JeonseRatioRow:
-    """jeonse_ratio 시트 한 행."""
-    collected_at: str
-    period: str         # YYYYWW
-    region: str
-    jeonse_ratio: float
-    source: str
-
-    def to_row(self) -> list[Any]:
-        return [self.collected_at, self.period, self.region, self.jeonse_ratio, self.source]
-
-    @classmethod
-    def headers(cls) -> list[str]:
-        return ["collected_at", "period", "region", "jeonse_ratio", "source"]
+        return ["collected_at", "period", "region",
+                "sale_index", "jeonse_index", "jeonse_idx_ratio", "source"]
 
 
 @dataclass
@@ -142,7 +133,6 @@ class UnsoldRow:
 class CollectResult:
     collected_at: str = ""
     price_index_rows: list[PriceIndexRow] = field(default_factory=list)
-    jeonse_ratio_rows: list[JeonseRatioRow] = field(default_factory=list)
     interest_rate_rows: list[InterestRateRow] = field(default_factory=list)
     apt_trade_rows: list[AptTradeRow] = field(default_factory=list)
     unsold_rows: list[UnsoldRow] = field(default_factory=list)
@@ -153,7 +143,6 @@ class CollectResult:
     def recount(self):
         self.total_rows = (
             len(self.price_index_rows)
-            + len(self.jeonse_ratio_rows)
             + len(self.interest_rate_rows)
             + len(self.apt_trade_rows)
             + len(self.unsold_rows)
@@ -169,36 +158,23 @@ def normalize_price_index(
     if collected_at is None:
         collected_at = _now_kst()
     ts = collected_at.strftime("%Y-%m-%d %H:%M:%S")
-    return [
-        PriceIndexRow(
+    rows = []
+    for r in results:
+        # 두 지수 모두 유효할 때만 비율 계산 (음수는 수집 실패를 의미)
+        if r.sale_index > 0 and r.jeonse_index > 0:
+            ratio = r.jeonse_index / r.sale_index * 100
+        else:
+            ratio = -1.0
+        rows.append(PriceIndexRow(
             collected_at=ts,
             period=r.period,
             region=r.region,
             sale_index=r.sale_index,
             jeonse_index=r.jeonse_index,
+            jeonse_idx_ratio=ratio,
             source=r.source,
-        )
-        for r in results
-    ]
-
-
-def normalize_jeonse_ratio(
-    results: list[JeonseRatioResult],
-    collected_at: datetime | None = None,
-) -> list[JeonseRatioRow]:
-    if collected_at is None:
-        collected_at = _now_kst()
-    ts = collected_at.strftime("%Y-%m-%d %H:%M:%S")
-    return [
-        JeonseRatioRow(
-            collected_at=ts,
-            period=r.period,
-            region=r.region,
-            jeonse_ratio=r.jeonse_ratio,
-            source=r.source,
-        )
-        for r in results
-    ]
+        ))
+    return rows
 
 
 def normalize_interest_rate(
@@ -274,7 +250,6 @@ def to_csv_rows(result: CollectResult) -> dict[str, list[list[Any]]]:
     """CollectResult를 CSV 딕셔너리로 변환한다. (로컬 디버그용)"""
     return {
         "price_index":   [PriceIndexRow.headers()]   + [r.to_row() for r in result.price_index_rows],
-        "jeonse_ratio":  [JeonseRatioRow.headers()]  + [r.to_row() for r in result.jeonse_ratio_rows],
         "interest_rate": [InterestRateRow.headers()]  + [r.to_row() for r in result.interest_rate_rows],
         "apt_trade":     [AptTradeRow.headers()]      + [r.to_row() for r in result.apt_trade_rows],
         "unsold":        [UnsoldRow.headers()]         + [r.to_row() for r in result.unsold_rows],

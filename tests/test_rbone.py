@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from scrapers.rbone import RboneScraper, PriceIndexResult, JeonseRatioResult
+from scrapers.rbone import RboneScraper, PriceIndexResult
 
 
 SAMPLE_SALE_IDX_ROWS = [
@@ -84,17 +84,19 @@ class TestGetPriceIndices:
         assert results[0].sale_index == -1.0
 
 
-class TestGetJeonseRatios:
-    def test_returns_five_regions(self):
+class TestGetLatest:
+    def test_returns_price_index_list(self):
         sc = make_scraper()
-        with patch.object(sc, "_fetch", return_value=SAMPLE_RATIO_ROWS):
-            results = sc.get_jeonse_ratios("202518", "202518")
-        assert len(results) == 5
 
-    def test_ratio_values(self):
-        sc = make_scraper()
-        with patch.object(sc, "_fetch", return_value=SAMPLE_RATIO_ROWS):
-            results = sc.get_jeonse_ratios("202518", "202518")
-        gyeonggi = next(r for r in results if r.region == "경기도")
-        assert gyeonggi.jeonse_ratio == pytest.approx(72.3)
-        assert gyeonggi.source == "rbone"
+        def mock_fetch(stats_code, prd_se, start, end):
+            from scrapers.rbone import DEFAULT_SALE_IDX_CODE
+            if stats_code == DEFAULT_SALE_IDX_CODE:
+                return SAMPLE_SALE_IDX_ROWS
+            return SAMPLE_JEONSE_IDX_ROWS
+
+        with patch.object(sc, "_fetch", side_effect=mock_fetch):
+            results = sc.get_latest("202518")
+
+        assert isinstance(results, list)
+        assert len(results) == 5
+        assert all(isinstance(r, PriceIndexResult) for r in results)

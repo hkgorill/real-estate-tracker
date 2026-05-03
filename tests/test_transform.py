@@ -6,14 +6,14 @@ from datetime import datetime, timezone, timedelta
 
 import pytest
 
-from scrapers.rbone import PriceIndexResult, JeonseRatioResult
+from scrapers.rbone import PriceIndexResult
 from scrapers.ecos import InterestRateResult
 from scrapers.molit import AptTradeItem, UnsoldItem
 from transform import (
-    normalize_price_index, normalize_jeonse_ratio,
+    normalize_price_index,
     normalize_interest_rate, normalize_apt_trade, normalize_unsold,
     CollectResult, to_csv_rows,
-    PriceIndexRow, JeonseRatioRow, InterestRateRow, AptTradeRow, UnsoldRow,
+    PriceIndexRow, InterestRateRow, AptTradeRow, UnsoldRow,
 )
 
 KST = timezone(timedelta(hours=9))
@@ -33,18 +33,20 @@ class TestNormalizePriceIndex:
         assert rows[0].sale_index == pytest.approx(105.2)
         assert rows[0].collected_at == "2025-05-03 04:00:00"
 
+    def test_jeonse_idx_ratio_calculated(self):
+        results = [PriceIndexResult(period="202518", region="전국", sale_index=120.0, jeonse_index=108.0)]
+        rows = normalize_price_index(results, collected_at=FIXED_TS)
+        assert rows[0].jeonse_idx_ratio == pytest.approx(90.0)
+
+    def test_jeonse_idx_ratio_negative_on_invalid(self):
+        results = [PriceIndexResult(period="202518", region="전국", sale_index=-1.0, jeonse_index=108.0)]
+        rows = normalize_price_index(results, collected_at=FIXED_TS)
+        assert rows[0].jeonse_idx_ratio == -1.0
+
     def test_to_row_length(self):
         results = [PriceIndexResult(period="202518", region="전국", sale_index=100.0, jeonse_index=99.0)]
         rows = normalize_price_index(results, collected_at=FIXED_TS)
         assert len(rows[0].to_row()) == len(PriceIndexRow.headers())
-
-
-class TestNormalizeJeonseRatio:
-    def test_basic_conversion(self):
-        results = [JeonseRatioResult(period="202518", region="서울특별시", jeonse_ratio=55.2)]
-        rows = normalize_jeonse_ratio(results, collected_at=FIXED_TS)
-        assert rows[0].jeonse_ratio == pytest.approx(55.2)
-        assert len(rows[0].to_row()) == len(JeonseRatioRow.headers())
 
 
 class TestNormalizeInterestRate:
@@ -103,7 +105,7 @@ class TestNormalizeUnsold:
 class TestCollectResult:
     def test_recount(self):
         result = CollectResult(collected_at="2025-05-03 04:00:00")
-        result.price_index_rows = [PriceIndexRow("ts", "202518", "전국", 100.0, 99.0, "rbone")] * 3
+        result.price_index_rows = [PriceIndexRow("ts", "202518", "전국", 100.0, 99.0, 99.0, "rbone")] * 3
         result.interest_rate_rows = [InterestRateRow("ts", "202503", 2.75, 4.10, "ecos")] * 2
         result.recount()
         assert result.total_rows == 5
@@ -111,7 +113,7 @@ class TestCollectResult:
     def test_to_csv_rows_has_all_sheets(self):
         result = CollectResult(collected_at="2025-05-03 04:00:00")
         tables = to_csv_rows(result)
-        expected_sheets = {"price_index", "jeonse_ratio", "interest_rate", "apt_trade", "unsold"}
+        expected_sheets = {"price_index", "interest_rate", "apt_trade", "unsold"}
         assert set(tables.keys()) == expected_sheets
 
     def test_to_csv_rows_headers_only_when_empty(self):

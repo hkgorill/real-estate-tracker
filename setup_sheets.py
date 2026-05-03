@@ -18,7 +18,7 @@ from loguru import logger
 
 from auth import get_sheets_service
 from transform import (
-    PriceIndexRow, JeonseRatioRow, InterestRateRow,
+    PriceIndexRow, InterestRateRow,
     AptTradeRow, UnsoldRow,
 )
 from writer import RunLogRow
@@ -30,13 +30,7 @@ SHEET_CONFIGS = [
         "name": "price_index",
         "headers": PriceIndexRow.headers(),
         "freeze_rows": 1,
-        "col_widths": {0: 160, 1: 80, 2: 120, 3: 110, 4: 120, 5: 80},
-    },
-    {
-        "name": "jeonse_ratio",
-        "headers": JeonseRatioRow.headers(),
-        "freeze_rows": 1,
-        "col_widths": {0: 160, 1: 80, 2: 120, 3: 110, 4: 80},
+        "col_widths": {0: 160, 1: 80, 2: 120, 3: 110, 4: 120, 5: 130, 6: 80},
     },
     {
         "name": "interest_rate",
@@ -149,7 +143,7 @@ def setup(spreadsheet_id: str):
         format_sheet(service, spreadsheet_id, sheet_id, config)
         logger.info("  → {} 컬럼 완료", len(config["headers"]))
 
-    logger.info("초기화 완료 — 6개 시트: {}", [c["name"] for c in SHEET_CONFIGS])
+    logger.info("초기화 완료 — 5개 시트: {}", [c["name"] for c in SHEET_CONFIGS])
 
 
 def parse_args():

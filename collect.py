@@ -33,7 +33,7 @@ from loguru import logger
 
 from transform import (
     CollectResult,
-    normalize_price_index, normalize_jeonse_ratio,
+    normalize_price_index,
     normalize_interest_rate, normalize_apt_trade, normalize_unsold,
     to_csv_rows,
 )
@@ -89,11 +89,10 @@ def collect_rbone(result: CollectResult, week: str):
     logger.info("[rbone] 주차 {} 수집 시작", week)
     try:
         with RboneScraper(api_key) as sc:
-            indices, ratios = sc.get_latest(week)
+            indices = sc.get_latest(week)
         result.price_index_rows.extend(normalize_price_index(indices))
-        result.jeonse_ratio_rows.extend(normalize_jeonse_ratio(ratios))
         result.sources_used.append("rbone")
-        logger.info("[rbone] 완료 — 가격지수 {}건, 전세가율 {}건", len(indices), len(ratios))
+        logger.info("[rbone] 완료 — 가격지수 {}건 (jeonse_idx_ratio 파생 포함)", len(indices))
     except Exception as exc:
         logger.error("[rbone] 수집 실패: {}", exc)
         result.error_count += 1

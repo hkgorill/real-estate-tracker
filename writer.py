@@ -20,7 +20,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 
 from transform import (
     CollectResult,
-    PriceIndexRow, JeonseRatioRow, InterestRateRow, AptTradeRow, UnsoldRow,
+    PriceIndexRow, InterestRateRow, AptTradeRow, UnsoldRow,
 )
 
 BATCH_SIZE = 500
@@ -145,9 +145,6 @@ class SheetsWriter:
         """period(YYYYWW) 기준 upsert. key_col=1 (period 열)."""
         self._upsert("price_index", [r.to_row() for r in rows], period, key_col=1)
 
-    def upsert_jeonse_ratio(self, rows: list[JeonseRatioRow], period: str):
-        self._upsert("jeonse_ratio", [r.to_row() for r in rows], period, key_col=1)
-
     def upsert_interest_rate(self, rows: list[InterestRateRow], period: str):
         self._upsert("interest_rate", [r.to_row() for r in rows], period, key_col=1)
 
@@ -164,16 +161,11 @@ class SheetsWriter:
 
     def write(self, result: CollectResult, run_log: RunLogRow):
         """수집 결과 전체를 Sheets에 기록한다."""
-        # price_index / jeonse_ratio: 주차(period) 기준으로 그룹화하여 upsert
+        # price_index: 주차(period) 기준으로 그룹화하여 upsert
         if result.price_index_rows:
             for period in sorted({r.period for r in result.price_index_rows}):
                 subset = [r for r in result.price_index_rows if r.period == period]
                 self.upsert_price_index(subset, period)
-
-        if result.jeonse_ratio_rows:
-            for period in sorted({r.period for r in result.jeonse_ratio_rows}):
-                subset = [r for r in result.jeonse_ratio_rows if r.period == period]
-                self.upsert_jeonse_ratio(subset, period)
 
         # interest_rate: 월(period) 기준
         if result.interest_rate_rows:

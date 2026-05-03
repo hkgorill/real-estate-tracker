@@ -58,20 +58,20 @@ class TestRunLogRow:
 
 class TestSheetsWriterUpsert:
     def test_upsert_appends_when_no_existing(self):
-        svc = make_mock_service(existing_values=[["collected_at", "period", "region", "sale_index", "jeonse_index", "source"]])
+        svc = make_mock_service(existing_values=[["collected_at", "period", "region", "sale_index", "jeonse_index", "jeonse_idx_ratio", "source"]])
         writer = SheetsWriter(svc, SPREADSHEET_ID)
-        rows = [PriceIndexRow("2025-05-03 04:00:00", "202518", "전국", 100.0, 99.0, "rbone")]
+        rows = [PriceIndexRow("2025-05-03 04:00:00", "202518", "전국", 100.0, 99.0, 99.0, "rbone")]
         writer.upsert_price_index(rows, "202518")
         svc.spreadsheets().values().append.assert_called()
 
     def test_upsert_deletes_existing_then_appends(self):
         existing = [
-            ["collected_at", "period", "region", "sale_index", "jeonse_index", "source"],
-            ["2025-05-02 04:00:00", "202518", "전국", "99.0", "98.0", "rbone"],
+            ["collected_at", "period", "region", "sale_index", "jeonse_index", "jeonse_idx_ratio", "source"],
+            ["2025-05-02 04:00:00", "202518", "전국", "99.0", "98.0", "98.99", "rbone"],
         ]
         svc = make_mock_service(existing_values=existing)
         writer = SheetsWriter(svc, SPREADSHEET_ID)
-        rows = [PriceIndexRow("2025-05-03 04:00:00", "202518", "전국", 100.0, 99.0, "rbone")]
+        rows = [PriceIndexRow("2025-05-03 04:00:00", "202518", "전국", 100.0, 99.0, 99.0, "rbone")]
         writer.upsert_price_index(rows, "202518")
         # batchUpdate(삭제) 호출 확인
         svc.spreadsheets().batchUpdate.assert_called()
@@ -90,7 +90,7 @@ class TestSheetsWriterWrite:
         writer = SheetsWriter(svc, SPREADSHEET_ID)
 
         result = CollectResult(collected_at="2025-05-03 04:00:00")
-        result.price_index_rows = [PriceIndexRow("ts", "202518", "전국", 100.0, 99.0, "rbone")]
+        result.price_index_rows = [PriceIndexRow("ts", "202518", "전국", 100.0, 99.0, 99.0, "rbone")]
         result.interest_rate_rows = [InterestRateRow("ts", "202503", 2.75, 4.10, "ecos")]
         result.unsold_rows = [UnsoldRow("ts", "202503", "서울특별시", 100, 60, 40, "molit_unsold")]
 

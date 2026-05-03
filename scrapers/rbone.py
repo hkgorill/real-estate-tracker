@@ -1,12 +1,15 @@
 """
 한국부동산원(R-ONE) OpenAPI 수집 모듈.
 
-[아파트 매매가격지수 / 전세가격지수 / 전세가율] 주간 데이터
+[아파트 매매가격지수 / 전세가격지수] 주간 데이터
+
+전세가율(주간) R-ONE 통계표 없음 → transform에서 (전세지수/매매지수×100)으로 파생 계산.
+이 값은 실제 전세가율이 아닌 지수 비율이며, 방향성·변화폭 분석에 활용한다.
 
 엔드포인트: https://www.reb.or.kr/r-one/openapi/SttsService.do
   파라미터:
     apiKey      : 발급 API 키
-    statsCode   : 통계표코드 (아래 STATS_CODES 참조)
+    statsCode   : 통계표코드 (아래 환경변수 참조)
     prdSe       : 기간구분 (W=주간)
     startPrdDe  : 시작기간 (YYYYWW, 예: 202401 = 2024년 1주차)
     endPrdDe    : 종료기간
@@ -16,7 +19,6 @@
   R-ONE 포털 (https://www.reb.or.kr/r-one) → 통계서비스 → 오픈API → 통계표코드 조회
   아파트 매매가격지수(주간) 코드를 환경변수 RBONE_SALE_IDX_CODE 에 설정하세요.
   아파트 전세가격지수(주간) 코드를 환경변수 RBONE_JEONSE_IDX_CODE 에 설정하세요.
-  전세가율(주간) 코드를 환경변수 RBONE_JEONSE_RATIO_CODE 에 설정하세요.
 
 API 키 발급: https://www.reb.or.kr/r-one → 오픈API → 활용신청
 """
@@ -33,9 +35,8 @@ RBONE_API_URL = "https://www.reb.or.kr/r-one/openapi/SttsService.do"
 
 # 통계표코드 — R-ONE 포털에서 확인 후 환경변수로 설정
 # 기본값은 플레이스홀더이므로 반드시 실제 코드로 교체할 것
-DEFAULT_SALE_IDX_CODE    = os.getenv("RBONE_SALE_IDX_CODE",    "R214000000")
-DEFAULT_JEONSE_IDX_CODE  = os.getenv("RBONE_JEONSE_IDX_CODE",  "R214000100")
-DEFAULT_JEONSE_RATIO_CODE = os.getenv("RBONE_JEONSE_RATIO_CODE", "R214000200")
+DEFAULT_SALE_IDX_CODE   = os.getenv("RBONE_SALE_IDX_CODE",   "R214000000")
+DEFAULT_JEONSE_IDX_CODE = os.getenv("RBONE_JEONSE_IDX_CODE", "R214000100")
 
 # R-ONE 권역 코드 (매매가격지수 기준)
 # 실제 코드는 R-ONE 포털 통계표에서 확인 필요
@@ -55,15 +56,6 @@ class PriceIndexResult:
     region: str        # 지역명
     sale_index: float  # 매매가격지수
     jeonse_index: float # 전세가격지수
-    source: str = "rbone"
-
-
-@dataclass
-class JeonseRatioResult:
-    """주간 전세가율 1건."""
-    period: str        # YYYYWW
-    region: str        # 지역명
-    jeonse_ratio: float  # 전세가율 (%)
     source: str = "rbone"
 
 
@@ -155,34 +147,6 @@ class RboneScraper:
         logger.info("[rbone] 가격지수 {} ~ {} → {}건", start_period, end_period, len(results))
         return results
 
-    def get_jeonse_ratios(
-        self,
-        start_period: str,
-        end_period: str,
-        regions: list[str] | None = None,
-    ) -> list[JeonseRatioResult]:
-        """기간 내 주간 전세가율을 수집한다."""
-        if regions is None:
-            regions = list(REGION_CODES.keys())
-
-        rows = self._fetch(DEFAULT_JEONSE_RATIO_CODE, "W", start_period, end_period)
-        results = []
-        for r in rows:
-            region = r.get("regNm", "")
-            if region not in regions:
-                continue
-            results.append(JeonseRatioResult(
-                period=r.get("prdDe", ""),
-                region=region,
-                jeonse_ratio=self._parse_float(r.get("wghtVal")),
-            ))
-
-        logger.info("[rbone] 전세가율 {} ~ {} → {}건", start_period, end_period, len(results))
-        return results
-
-    def get_latest(self, current_week: str) -> tuple[list[PriceIndexResult], list[JeonseRatioResult]]:
-        """최신 주차 1건의 가격지수 + 전세가율을 반환한다."""
-        indices = self.get_price_indices(current_week, current_week)
-        time.sleep(0.5)
-        ratios = self.get_jeonse_ratios(current_week, current_week)
-        return indices, ratios
+    def get_latest(self, current_week: str) -> list[PriceIndexResult]:
+        """최신 주차의 가격지수를 반환한다. 전세/매매 지수 비율은 transform에서 파생."""
+        return self.get_price_indices(current_week, current_week)
