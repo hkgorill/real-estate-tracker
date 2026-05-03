@@ -1,0 +1,62 @@
+name: 수도권 아파트 매물 수집
+
+on:
+  schedule:
+    # KST 04:00 = UTC 19:00 (전날)
+    - cron: '0 19 * * *'
+  workflow_dispatch:
+    inputs:
+      region:
+        description: '수집 지역 필터 (비워두면 전체, 예: 강남구)'
+        required: false
+        default: ''
+      source:
+        description: '데이터 소스 (auto / zigbang / naver)'
+        required: false
+        default: 'auto'
+
+permissions:
+  contents: read
+  id-token: write   # Workload Identity Federation 필수
+
+jobs:
+  collect:
+    name: 매물 수집 및 Sheets 적재
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: 의존성 설치
+        run: pip install -r requirements.txt
+
+      - name: Google Cloud 인증 (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: 매물 수집 및 Sheets 적재
+        env:
+          GOOGLE_SHEETS_ID: ${{ secrets.GOOGLE_SHEETS_ID }}
+          LOG_LEVEL: INFO
+          REQUEST_DELAY_MIN: '1.5'
+          REQUEST_DELAY_MAX: '3.5'
+        run: |
+          python collect.py \
+            --source "${{ github.event.inputs.source || 'auto' }}" \
+            ${{ github.event.inputs.region != '' && format('--region "{0}"', github.event.inputs.region) || '' }}
+
+      - name: 실패 시 요약 출력
+        if: failure()
+        run: |
+          echo "::error::매물 수집 실패. 로그를 확인하세요."
+          echo "실행 시각 (KST): $(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M:%S')"
