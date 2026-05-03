@@ -1,172 +1,281 @@
 """
-수집 결과 정규화 및 집계 모듈.
+수집 결과 정규화 및 시트별 행 변환 모듈.
 
-scrapers에서 반환된 결과를 ARD 스키마(raw_data, summary)에 맞게 변환한다.
+4종 데이터 소스 → 5개 시트 스키마로 변환:
+  R-ONE    → price_index, jeonse_ratio
+  ECOS     → interest_rate
+  MOLIT    → apt_trade, unsold
 """
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
+from scrapers.rbone import PriceIndexResult, JeonseRatioResult
+from scrapers.ecos import InterestRateResult
+from scrapers.molit import AptTradeItem, UnsoldItem
+
 KST = timezone(timedelta(hours=9))
-
-TRADE_TYPES = ["매매", "전세", "월세"]
-
-
-@dataclass
-class RawRow:
-    """raw_data 시트 한 행."""
-    collected_at: str     # ISO datetime KST
-    date: str             # YYYY-MM-DD KST
-    region_level1: str
-    region_level2: str
-    trade_type: str       # 매매 | 전세 | 월세
-    listing_count: int
-    source: str           # zigbang | naver | zigbang_error | naver_error
-    status: str           # ok | error
-    error_msg: str = ""
-
-    def to_row(self) -> list[Any]:
-        return [
-            self.collected_at,
-            self.date,
-            self.region_level1,
-            self.region_level2,
-            self.trade_type,
-            self.listing_count,
-            self.source,
-            self.status,
-            self.error_msg,
-        ]
-
-    @classmethod
-    def headers(cls) -> list[str]:
-        return [
-            "collected_at", "date", "region_level1", "region_level2",
-            "trade_type", "listing_count", "source", "status", "error_msg",
-        ]
-
-
-@dataclass
-class SummaryRow:
-    """summary 시트 한 행."""
-    date: str
-    region_level1: str
-    region_level2: str
-    sale_count: int = 0
-    jeonse_count: int = 0
-    monthly_count: int = 0
-    total_count: int = 0
-
-    def to_row(self) -> list[Any]:
-        return [
-            self.date,
-            self.region_level1,
-            self.region_level2,
-            self.sale_count,
-            self.jeonse_count,
-            self.monthly_count,
-            self.total_count,
-        ]
-
-    @classmethod
-    def headers(cls) -> list[str]:
-        return [
-            "date", "region_level1", "region_level2",
-            "sale_count", "jeonse_count", "monthly_count", "total_count",
-        ]
-
-
-@dataclass
-class TransformResult:
-    raw_rows: list[RawRow] = field(default_factory=list)
-    summary_rows: list[SummaryRow] = field(default_factory=list)
-    collected_at: str = ""
-    date: str = ""
-    error_count: int = 0
-    total_rows: int = 0
 
 
 def _now_kst() -> datetime:
     return datetime.now(KST)
 
 
-def normalize(scraper_results: list[Any], collected_at: datetime | None = None) -> TransformResult:
-    """
-    zigbang / naver scraper 결과 목록을 raw_rows + summary_rows로 변환한다.
+# ── 시트별 Row 모델 ────────────────────────────────────────────────────────────
 
-    scraper_results: ZigbangResult 또는 NaverResult 리스트
-    """
+@dataclass
+class PriceIndexRow:
+    """price_index 시트 한 행."""
+    collected_at: str
+    period: str         # YYYYWW
+    region: str
+    sale_index: float
+    jeonse_index: float
+    source: str
+
+    def to_row(self) -> list[Any]:
+        return [self.collected_at, self.period, self.region,
+                self.sale_index, self.jeonse_index, self.source]
+
+    @classmethod
+    def headers(cls) -> list[str]:
+        return ["collected_at", "period", "region", "sale_index", "jeonse_index", "source"]
+
+
+@dataclass
+class JeonseRatioRow:
+    """jeonse_ratio 시트 한 행."""
+    collected_at: str
+    period: str         # YYYYWW
+    region: str
+    jeonse_ratio: float
+    source: str
+
+    def to_row(self) -> list[Any]:
+        return [self.collected_at, self.period, self.region, self.jeonse_ratio, self.source]
+
+    @classmethod
+    def headers(cls) -> list[str]:
+        return ["collected_at", "period", "region", "jeonse_ratio", "source"]
+
+
+@dataclass
+class InterestRateRow:
+    """interest_rate 시트 한 행."""
+    collected_at: str
+    period: str         # YYYYMM
+    base_rate: float
+    mortgage_rate: float
+    source: str
+
+    def to_row(self) -> list[Any]:
+        return [self.collected_at, self.period, self.base_rate, self.mortgage_rate, self.source]
+
+    @classmethod
+    def headers(cls) -> list[str]:
+        return ["collected_at", "period", "base_rate", "mortgage_rate", "source"]
+
+
+@dataclass
+class AptTradeRow:
+    """apt_trade 시트 한 행."""
+    collected_at: str
+    deal_ym: str            # YYYYMM
+    deal_date: str          # YYYY-MM-DD
+    region_level1: str
+    region_level2: str
+    dong: str
+    apt_name: str
+    area_sqm: float
+    floor: int
+    price_manwon: int
+    build_year: int
+    source: str
+
+    def to_row(self) -> list[Any]:
+        return [
+            self.collected_at, self.deal_ym, self.deal_date,
+            self.region_level1, self.region_level2, self.dong,
+            self.apt_name, self.area_sqm, self.floor,
+            self.price_manwon, self.build_year, self.source,
+        ]
+
+    @classmethod
+    def headers(cls) -> list[str]:
+        return [
+            "collected_at", "deal_ym", "deal_date",
+            "region_level1", "region_level2", "dong",
+            "apt_name", "area_sqm", "floor",
+            "price_manwon", "build_year", "source",
+        ]
+
+
+@dataclass
+class UnsoldRow:
+    """unsold 시트 한 행."""
+    collected_at: str
+    deal_ym: str            # YYYYMM
+    region_level1: str
+    unsold_total: int
+    unsold_before: int      # 준공 전 미분양
+    unsold_after: int       # 준공 후 미분양 (악성)
+    source: str
+
+    def to_row(self) -> list[Any]:
+        return [
+            self.collected_at, self.deal_ym, self.region_level1,
+            self.unsold_total, self.unsold_before, self.unsold_after, self.source,
+        ]
+
+    @classmethod
+    def headers(cls) -> list[str]:
+        return [
+            "collected_at", "deal_ym", "region_level1",
+            "unsold_total", "unsold_before", "unsold_after", "source",
+        ]
+
+
+# ── 수집 결과 컨테이너 ─────────────────────────────────────────────────────────
+
+@dataclass
+class CollectResult:
+    collected_at: str = ""
+    price_index_rows: list[PriceIndexRow] = field(default_factory=list)
+    jeonse_ratio_rows: list[JeonseRatioRow] = field(default_factory=list)
+    interest_rate_rows: list[InterestRateRow] = field(default_factory=list)
+    apt_trade_rows: list[AptTradeRow] = field(default_factory=list)
+    unsold_rows: list[UnsoldRow] = field(default_factory=list)
+    error_count: int = 0
+    total_rows: int = 0
+    sources_used: list[str] = field(default_factory=list)
+
+    def recount(self):
+        self.total_rows = (
+            len(self.price_index_rows)
+            + len(self.jeonse_ratio_rows)
+            + len(self.interest_rate_rows)
+            + len(self.apt_trade_rows)
+            + len(self.unsold_rows)
+        )
+
+
+# ── 변환 함수 ──────────────────────────────────────────────────────────────────
+
+def normalize_price_index(
+    results: list[PriceIndexResult],
+    collected_at: datetime | None = None,
+) -> list[PriceIndexRow]:
     if collected_at is None:
         collected_at = _now_kst()
-
-    collected_at_str = collected_at.strftime("%Y-%m-%d %H:%M:%S")
-    date_str = collected_at.strftime("%Y-%m-%d")
-
-    raw_rows: list[RawRow] = []
-    error_count = 0
-
-    for r in scraper_results:
-        is_error = r.listing_count < 0 or "error" in r.source
-        raw_rows.append(
-            RawRow(
-                collected_at=collected_at_str,
-                date=date_str,
-                region_level1=r.region_level1,
-                region_level2=r.region_level2,
-                trade_type=r.trade_type,
-                listing_count=max(r.listing_count, 0),
-                source=r.source,
-                status="error" if is_error else "ok",
-                error_msg="수집 실패" if is_error else "",
-            )
+    ts = collected_at.strftime("%Y-%m-%d %H:%M:%S")
+    return [
+        PriceIndexRow(
+            collected_at=ts,
+            period=r.period,
+            region=r.region,
+            sale_index=r.sale_index,
+            jeonse_index=r.jeonse_index,
+            source=r.source,
         )
-        if is_error:
-            error_count += 1
-
-    summary_rows = _build_summary(raw_rows, date_str)
-
-    return TransformResult(
-        raw_rows=raw_rows,
-        summary_rows=summary_rows,
-        collected_at=collected_at_str,
-        date=date_str,
-        error_count=error_count,
-        total_rows=len(raw_rows),
-    )
+        for r in results
+    ]
 
 
-def _build_summary(raw_rows: list[RawRow], date_str: str) -> list[SummaryRow]:
-    """raw_rows를 지역×날짜 단위로 집계하여 summary_rows를 생성한다."""
-    index: dict[tuple[str, str], SummaryRow] = {}
-
-    for row in raw_rows:
-        if row.status == "error":
-            continue
-        key = (row.region_level1, row.region_level2)
-        if key not in index:
-            index[key] = SummaryRow(
-                date=date_str,
-                region_level1=row.region_level1,
-                region_level2=row.region_level2,
-            )
-        s = index[key]
-        if row.trade_type == "매매":
-            s.sale_count = row.listing_count
-        elif row.trade_type == "전세":
-            s.jeonse_count = row.listing_count
-        elif row.trade_type == "월세":
-            s.monthly_count = row.listing_count
-
-    for s in index.values():
-        s.total_count = s.sale_count + s.jeonse_count + s.monthly_count
-
-    return list(index.values())
+def normalize_jeonse_ratio(
+    results: list[JeonseRatioResult],
+    collected_at: datetime | None = None,
+) -> list[JeonseRatioRow]:
+    if collected_at is None:
+        collected_at = _now_kst()
+    ts = collected_at.strftime("%Y-%m-%d %H:%M:%S")
+    return [
+        JeonseRatioRow(
+            collected_at=ts,
+            period=r.period,
+            region=r.region,
+            jeonse_ratio=r.jeonse_ratio,
+            source=r.source,
+        )
+        for r in results
+    ]
 
 
-def to_csv_rows(result: TransformResult) -> dict[str, list[list[Any]]]:
-    """TransformResult를 CSV 딕셔너리로 변환한다. (로컬 디버그용)"""
+def normalize_interest_rate(
+    results: list[InterestRateResult],
+    collected_at: datetime | None = None,
+) -> list[InterestRateRow]:
+    if collected_at is None:
+        collected_at = _now_kst()
+    ts = collected_at.strftime("%Y-%m-%d %H:%M:%S")
+    return [
+        InterestRateRow(
+            collected_at=ts,
+            period=r.period,
+            base_rate=r.base_rate,
+            mortgage_rate=r.mortgage_rate,
+            source=r.source,
+        )
+        for r in results
+    ]
+
+
+def normalize_apt_trade(
+    items: list[AptTradeItem],
+    collected_at: datetime | None = None,
+) -> list[AptTradeRow]:
+    if collected_at is None:
+        collected_at = _now_kst()
+    ts = collected_at.strftime("%Y-%m-%d %H:%M:%S")
+    rows = []
+    for item in items:
+        day = item.deal_day.strip().zfill(2) if item.deal_day.strip() else "01"
+        ym = item.deal_ym  # YYYYMM
+        deal_date = f"{ym[:4]}-{ym[4:6]}-{day}"
+        rows.append(AptTradeRow(
+            collected_at=ts,
+            deal_ym=item.deal_ym,
+            deal_date=deal_date,
+            region_level1=item.region_level1,
+            region_level2=item.region_level2,
+            dong=item.dong,
+            apt_name=item.apt_name,
+            area_sqm=item.area_sqm,
+            floor=item.floor,
+            price_manwon=item.price_manwon,
+            build_year=item.build_year,
+            source=item.source,
+        ))
+    return rows
+
+
+def normalize_unsold(
+    items: list[UnsoldItem],
+    collected_at: datetime | None = None,
+) -> list[UnsoldRow]:
+    if collected_at is None:
+        collected_at = _now_kst()
+    ts = collected_at.strftime("%Y-%m-%d %H:%M:%S")
+    return [
+        UnsoldRow(
+            collected_at=ts,
+            deal_ym=item.deal_ym,
+            region_level1=item.region_level1,
+            unsold_total=item.unsold_total,
+            unsold_before=item.unsold_before,
+            unsold_after=item.unsold_after,
+            source=item.source,
+        )
+        for item in items
+    ]
+
+
+def to_csv_rows(result: CollectResult) -> dict[str, list[list[Any]]]:
+    """CollectResult를 CSV 딕셔너리로 변환한다. (로컬 디버그용)"""
     return {
-        "raw_data": [RawRow.headers()] + [r.to_row() for r in result.raw_rows],
-        "summary": [SummaryRow.headers()] + [r.to_row() for r in result.summary_rows],
+        "price_index":   [PriceIndexRow.headers()]   + [r.to_row() for r in result.price_index_rows],
+        "jeonse_ratio":  [JeonseRatioRow.headers()]  + [r.to_row() for r in result.jeonse_ratio_rows],
+        "interest_rate": [InterestRateRow.headers()]  + [r.to_row() for r in result.interest_rate_rows],
+        "apt_trade":     [AptTradeRow.headers()]      + [r.to_row() for r in result.apt_trade_rows],
+        "unsold":        [UnsoldRow.headers()]         + [r.to_row() for r in result.unsold_rows],
     }

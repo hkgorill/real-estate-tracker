@@ -1,7 +1,7 @@
 """
 Google Sheets 초기 스키마 생성 스크립트.
 
-최초 1회 실행으로 raw_data / summary / run_log 시트와 헤더를 만든다.
+최초 1회 실행으로 6개 시트와 헤더를 만든다.
 이미 존재하는 시트는 건드리지 않는다.
 
 사용:
@@ -17,74 +17,91 @@ from dotenv import load_dotenv
 from loguru import logger
 
 from auth import get_sheets_service
-from transform import RawRow, SummaryRow
+from transform import (
+    PriceIndexRow, JeonseRatioRow, InterestRateRow,
+    AptTradeRow, UnsoldRow,
+)
+from writer import RunLogRow
 
 load_dotenv()
 
 SHEET_CONFIGS = [
     {
-        "name": "raw_data",
-        "headers": RawRow.headers(),
+        "name": "price_index",
+        "headers": PriceIndexRow.headers(),
         "freeze_rows": 1,
-        "col_widths": {0: 160, 1: 100, 2: 120, 3: 100, 4: 80, 5: 100, 6: 90, 7: 60, 8: 200},
+        "col_widths": {0: 160, 1: 80, 2: 120, 3: 110, 4: 120, 5: 80},
     },
     {
-        "name": "summary",
-        "headers": SummaryRow.headers(),
+        "name": "jeonse_ratio",
+        "headers": JeonseRatioRow.headers(),
         "freeze_rows": 1,
-        "col_widths": {0: 100, 1: 120, 2: 100, 3: 100, 4: 110, 5: 110, 6: 100},
+        "col_widths": {0: 160, 1: 80, 2: 120, 3: 110, 4: 80},
+    },
+    {
+        "name": "interest_rate",
+        "headers": InterestRateRow.headers(),
+        "freeze_rows": 1,
+        "col_widths": {0: 160, 1: 80, 2: 100, 3: 130, 4: 80},
+    },
+    {
+        "name": "apt_trade",
+        "headers": AptTradeRow.headers(),
+        "freeze_rows": 1,
+        "col_widths": {0: 160, 1: 80, 2: 100, 3: 120, 4: 120, 5: 100,
+                       6: 160, 7: 90, 8: 60, 9: 110, 10: 90, 11: 80},
+    },
+    {
+        "name": "unsold",
+        "headers": UnsoldRow.headers(),
+        "freeze_rows": 1,
+        "col_widths": {0: 160, 1: 80, 2: 120, 3: 110, 4: 110, 5: 120, 6: 80},
     },
     {
         "name": "run_log",
-        "headers": ["run_at", "status", "total_rows", "error_count", "source_used", "duration_sec"],
+        "headers": RunLogRow.headers(),
         "freeze_rows": 1,
-        "col_widths": {0: 160, 1: 80, 2: 90, 3: 100, 4: 90, 5: 110},
+        "col_widths": {0: 160, 1: 80, 2: 90, 3: 100, 4: 160, 5: 110},
     },
 ]
 
+HEADER_BG = {"red": 0.85, "green": 0.91, "blue": 0.96}
+
 
 def get_existing_sheets(service, spreadsheet_id: str) -> dict[str, int]:
-    """현재 스프레드시트의 시트명 → sheetId 매핑을 반환한다."""
     meta = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
     return {s["properties"]["title"]: s["properties"]["sheetId"] for s in meta["sheets"]}
 
 
 def add_sheet(service, spreadsheet_id: str, sheet_name: str) -> int:
-    """새 시트를 추가하고 sheetId를 반환한다."""
     body = {"requests": [{"addSheet": {"properties": {"title": sheet_name}}}]}
     resp = service.spreadsheets().batchUpdate(spreadsheetId=spreadsheet_id, body=body).execute()
     return resp["replies"][0]["addSheet"]["properties"]["sheetId"]
 
 
 def write_headers(service, spreadsheet_id: str, sheet_name: str, headers: list[str]):
-    range_name = f"{sheet_name}!A1"
-    body = {"values": [headers]}
     service.spreadsheets().values().update(
         spreadsheetId=spreadsheet_id,
-        range=range_name,
+        range=f"{sheet_name}!A1",
         valueInputOption="RAW",
-        body=body,
+        body={"values": [headers]},
     ).execute()
 
 
 def format_sheet(service, spreadsheet_id: str, sheet_id: int, config: dict):
-    """헤더 행 굵게, 고정, 열 너비 설정."""
-    header_count = len(config["headers"])
     requests = [
-        # 헤더 행 굵게 + 배경색
         {
             "repeatCell": {
                 "range": {"sheetId": sheet_id, "startRowIndex": 0, "endRowIndex": 1},
                 "cell": {
                     "userEnteredFormat": {
                         "textFormat": {"bold": True},
-                        "backgroundColor": {"red": 0.85, "green": 0.91, "blue": 0.96},
+                        "backgroundColor": HEADER_BG,
                     }
                 },
                 "fields": "userEnteredFormat(textFormat,backgroundColor)",
             }
         },
-        # 헤더 행 고정
         {
             "updateSheetProperties": {
                 "properties": {
@@ -95,7 +112,6 @@ def format_sheet(service, spreadsheet_id: str, sheet_id: int, config: dict):
             }
         },
     ]
-
     for col_idx, width_px in config.get("col_widths", {}).items():
         requests.append({
             "updateDimensionProperties": {
@@ -109,7 +125,6 @@ def format_sheet(service, spreadsheet_id: str, sheet_id: int, config: dict):
                 "fields": "pixelSize",
             }
         })
-
     service.spreadsheets().batchUpdate(
         spreadsheetId=spreadsheet_id,
         body={"requests": requests},
@@ -132,9 +147,9 @@ def setup(spreadsheet_id: str):
         sheet_id = add_sheet(service, spreadsheet_id, name)
         write_headers(service, spreadsheet_id, name, config["headers"])
         format_sheet(service, spreadsheet_id, sheet_id, config)
-        logger.info("  → 헤더 {} 컬럼 설정 완료", len(config["headers"]))
+        logger.info("  → {} 컬럼 완료", len(config["headers"]))
 
-    logger.info("초기화 완료")
+    logger.info("초기화 완료 — 6개 시트: {}", [c["name"] for c in SHEET_CONFIGS])
 
 
 def parse_args():
@@ -152,7 +167,6 @@ if __name__ == "__main__":
     if not args.sheets_id:
         logger.error("GOOGLE_SHEETS_ID가 설정되지 않았습니다.")
         sys.exit(1)
-
     logger.remove()
     logger.add(sys.stderr, level="INFO", colorize=True)
     setup(args.sheets_id)
