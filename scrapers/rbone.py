@@ -91,7 +91,18 @@ class RboneScraper:
         }
         resp = self._client.get(RBONE_API_URL, params=params)
         resp.raise_for_status()
-        data = resp.json()
+
+        if not resp.text.strip():
+            raise RuntimeError(
+                f"R-ONE API 빈 응답 — 통계코드를 확인하세요 (statsCode={stats_code}). "
+                f"R-ONE 포털 https://www.reb.or.kr/r-one → 오픈API → 통계표코드 조회"
+            )
+
+        try:
+            data = resp.json()
+        except Exception:
+            preview = resp.text[:200]
+            raise RuntimeError(f"R-ONE API JSON 파싱 실패 (statsCode={stats_code}). 응답 앞부분: {preview}")
 
         # 응답 구조: {"SttsService": {"list": [...], "totalCnt": N}}
         # 또는 오류: {"result": {"resultCode": "...", "resultMsg": "..."}}

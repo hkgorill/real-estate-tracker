@@ -99,23 +99,51 @@ def collect_rbone(result: CollectResult, week: str):
 
 
 def collect_ecos(result: CollectResult, year_month: str):
-    """ECOS에서 월간 금리를 수집한다."""
+    """ECOS에서 월간 금리를 수집한다.
+
+    ECOS 월간 데이터는 보통 1~2달 후 집계되므로,
+    요청한 월에 데이터가 없으면 최대 3개월 전까지 소급한다.
+    """
     api_key = os.getenv("ECOS_API_KEY")
     if not api_key:
         logger.warning("[ecos] ECOS_API_KEY 미설정 — 건너뜀")
         return
 
     from scrapers.ecos import EcosScraper
-    logger.info("[ecos] {} 금리 수집 시작", year_month)
-    try:
-        with EcosScraper(api_key) as sc:
-            rates = sc.get_interest_rates(year_month, year_month)
-        result.interest_rate_rows.extend(normalize_interest_rate(rates))
-        result.sources_used.append("ecos")
-        logger.info("[ecos] 완료 — {}건", len(rates))
-    except Exception as exc:
-        logger.error("[ecos] 수집 실패: {}", exc)
-        result.error_count += 1
+
+    def _prev_ym(ym: str) -> str:
+        y, m = int(ym[:4]), int(ym[4:])
+        m -= 1
+        if m == 0:
+            y, m = y - 1, 12
+        return f"{y}{m:02d}"
+
+    target = year_month
+    with EcosScraper(api_key) as sc:
+        for attempt in range(4):
+            logger.info("[ecos] {} 금리 수집 시작", target)
+            try:
+                rates = sc.get_interest_rates(target, target)
+                if rates:
+                    result.interest_rate_rows.extend(normalize_interest_rate(rates))
+                    result.sources_used.append("ecos")
+                    if attempt > 0:
+                        logger.info("[ecos] {} 데이터 없음 → {} 소급 수집 완료", year_month, target)
+                    else:
+                        logger.info("[ecos] 완료 — {}건", len(rates))
+                    return
+                logger.warning("[ecos] {} 데이터 없음, 이전 월 재시도", target)
+            except Exception as exc:
+                if "데이터가 없습니다" in str(exc):
+                    logger.warning("[ecos] {} 데이터 없음, 이전 월 재시도", target)
+                else:
+                    logger.error("[ecos] 수집 실패: {}", exc)
+                    result.error_count += 1
+                    return
+            target = _prev_ym(target)
+
+    logger.error("[ecos] {} 포함 최근 4개월 데이터 없음", year_month)
+    result.error_count += 1
 
 
 def collect_molit(result: CollectResult, deal_ym: str, regions: list[dict]):

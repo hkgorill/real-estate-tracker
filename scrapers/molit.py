@@ -94,7 +94,7 @@ class MolitScraper:
         resp.raise_for_status()
         root = ET.fromstring(resp.text)
         result_code = root.findtext("header/resultCode") or root.findtext("resultCode") or "00"
-        if result_code not in ("00", "0000"):
+        if result_code not in ("00", "000", "0000"):
             result_msg = root.findtext("header/resultMsg") or root.findtext("resultMsg") or "Unknown"
             raise RuntimeError(f"API 오류 {result_code}: {result_msg}")
         return root
